@@ -1,0 +1,1142 @@
+<title>NetPlan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: toolbar on top; device palette | blueprint canvas | inspector. Stacks to one column on phones. */
+:root {
+  --bg: #e9edf2;
+  --panel: #ffffff;
+  --panel-2: #f3f6f9;
+  --canvas: #f8fafc;
+  --grid: #d3dbe5;
+  --fg: #18212d;
+  --muted: #5d6a7a;
+  --line: #d8dfe7;
+  --accent: #2652c4;
+  --accent-fg: #ffffff;
+  --sel: #e19a06;
+  --link: #6b7684;
+  --danger: #c2392b;
+  --font-ui: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151b; --panel: #171c24; --panel-2: #1d232d; --canvas: #0e1217; --grid: #243041;
+    --fg: #e3e8ef; --muted: #93a0b1; --line: #2a3340; --accent: #7d9bf2; --accent-fg: #0e1217;
+    --sel: #f3b733; --link: #8a96a6; --danger: #ef6b5d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151b; --panel: #171c24; --panel-2: #1d232d; --canvas: #0e1217; --grid: #243041;
+  --fg: #e3e8ef; --muted: #93a0b1; --line: #2a3340; --accent: #7d9bf2; --accent-fg: #0e1217;
+  --sel: #f3b733; --link: #8a96a6; --danger: #ef6b5d; color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+.bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .02em; margin-right: 4px; }
+.brand svg { width: 22px; height: 22px; }
+.title-input { min-width: 0; width: 260px; max-width: 100%; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 5px 8px; font-weight: 600; }
+.title-input:hover, .title-input:focus { border-color: var(--line); background: var(--panel-2); }
+.sep { width: 1px; height: 24px; background: var(--line); }
+.grp { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--panel); cursor: pointer; white-space: nowrap; line-height: 1.2;
+}
+.btn:hover { background: var(--panel-2); }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.danger { color: var(--danger); }
+.btn.danger.armed { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn:disabled { opacity: .45; cursor: default; }
+.sel-sm { padding: 5px 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); }
+.kbd { font-family: var(--font-mono); font-size: 11px; opacity: .7; }
+.spacer { flex: 1; }
+.server-pill { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.server-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.server-pill.on i { background: #2f9e5a; }
+
+.main { min-height: 0; display: grid; grid-template-columns: 216px minmax(0, 1fr) 320px; }
+.palette { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px 10px 20px; }
+.palette h3 { margin: 14px 4px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.palette h3:first-child { margin-top: 0; }
+.pal-list { display: grid; grid-template-columns: 1fr; gap: 2px; }
+.pal-item {
+  display: flex; align-items: center; gap: 10px; padding: 6px 6px; border-radius: 8px; border: 1px solid transparent;
+  background: transparent; cursor: grab; text-align: left; width: 100%;
+}
+.pal-item:hover { background: var(--panel-2); border-color: var(--line); }
+.pal-item .tile { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; flex: none; }
+.pal-item .tile svg { width: 20px; height: 20px; }
+.pal-hint { font-size: 12px; color: var(--muted); margin: 14px 4px 0; line-height: 1.5; }
+
+.stage { position: relative; min-width: 0; min-height: 0; background: var(--canvas); overflow: hidden; }
+#canvas { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+#canvas.mode-connect { cursor: crosshair; }
+#canvas.mode-zone { cursor: cell; }
+.zoomctl { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+.zoomctl .btn { border: none; padding: 5px 8px; }
+.zoomctl span { font-family: var(--font-mono); font-size: 12px; color: var(--muted); align-self: center; min-width: 44px; text-align: center; }
+.hint { position: absolute; left: 12px; top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--muted); max-width: calc(100% - 24px); }
+.hint b { color: var(--fg); font-weight: 600; }
+
+.inspector { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 14px 28px; }
+.insp-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.insp-head .tile { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; flex: none; }
+.insp-head .tile svg { width: 24px; height: 24px; }
+.insp-head h2 { font-size: 15px; margin: 0; line-height: 1.3; text-wrap: balance; }
+.insp-head small { color: var(--muted); font-size: 12px; }
+.sec { margin: 16px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.sec::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.f.full { grid-column: 1 / -1; }
+.f label { font-size: 12px; color: var(--muted); }
+.f input, .f select, .f textarea {
+  width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2);
+}
+.f input:focus, .f select:focus, .f textarea:focus { border-color: var(--accent); outline: none; background: var(--panel); }
+.f .mono { font-family: var(--font-mono); font-size: 13px; }
+.f textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+.custom-row { display: grid; grid-template-columns: 1fr 1.3fr auto; gap: 6px; margin-bottom: 6px; }
+.custom-row input { min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+.icon-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; width: 32px; cursor: pointer; display: grid; place-items: center; }
+.icon-btn svg { width: 14px; height: 14px; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.stats { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 13px; }
+.stats .n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.stats .t { display: flex; align-items: center; gap: 8px; }
+.stats .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.help { font-size: 13px; color: var(--muted); line-height: 1.6; padding-left: 18px; margin: 0; }
+.help b { color: var(--fg); font-weight: 600; }
+.legend { display: grid; gap: 6px; font-size: 12.5px; }
+.legend div { display: flex; align-items: center; gap: 8px; }
+.legend svg { width: 44px; height: 10px; flex: none; }
+.muted { color: var(--muted); }
+
+.overlay { position: fixed; inset: 0; background: rgb(10 14 20 / .45); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: min(640px, 100%); max-height: 90%; overflow: auto; padding: 18px; display: grid; gap: 12px; }
+.modal h2 { margin: 0; font-size: 16px; }
+.modal textarea { width: 100%; min-height: 260px; font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--panel-2); }
+.list { display: grid; gap: 4px; }
+.list-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.list-row.current { border-color: var(--accent); }
+.list-row small { color: var(--muted); display: block; font-size: 12px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 60; max-width: calc(100% - 32px); }
+
+/* SVG diagram */
+.nlabel { font: 600 12.5px var(--font-ui); fill: var(--fg); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
+.nip { font: 500 11px var(--font-mono); fill: var(--muted); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
+.llabel { font: 500 11px var(--font-mono); fill: var(--fg); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
+.lport { font: 500 10px var(--font-mono); fill: var(--muted); paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; stroke-linejoin: round; }
+.zlabel { font: 700 13px var(--font-ui); }
+.ring { fill: none; stroke: var(--sel); stroke-width: 2.5; }
+.node { cursor: pointer; }
+.hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
+.statdot { stroke: var(--canvas); stroke-width: 2; }
+
+@media (max-width: 900px) {
+  html, body { height: auto; }
+  .app { height: auto; display: block; }
+  .main { display: flex; flex-direction: column; }
+  .palette { border-right: none; border-bottom: 1px solid var(--line); padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; }
+  .palette h3, .pal-hint { display: none; }
+  .pal-list { display: flex; gap: 6px; }
+  .pal-item { flex-direction: column; gap: 4px; width: 76px; font-size: 11px; text-align: center; padding: 6px 4px; }
+  .stage { height: 64vh; min-height: 380px; }
+  .inspector { border-left: none; border-top: 1px solid var(--line); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .title-input { width: 100%; order: 10; }
+  .hide-sm { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand" aria-label="NetPlan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="5" rx="1"/><rect x="2.5" y="16.5" width="6" height="5" rx="1"/><rect x="15.5" y="16.5" width="6" height="5" rx="1"/><path d="M12 7.5v4.5M5.5 16.5V12h13v4.5"/></svg>
+      NetPlan
+    </div>
+    <input id="docTitle" class="title-input" aria-label="ชื่อผัง" maxlength="120">
+    <div class="sep hide-sm"></div>
+    <div class="grp" role="group" aria-label="โหมด">
+      <button class="btn" id="modeSelect" data-mode="select" title="เลือก / ย้าย (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg>เลือก/ย้าย</button>
+      <button class="btn" id="modeConnect" data-mode="connect" title="ลากสายเชื่อม (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg>เชื่อมสาย</button>
+      <select id="linkKind" class="sel-sm" aria-label="ชนิดสายเริ่มต้น" title="ชนิดสายที่จะสร้าง"></select>
+      <button class="btn" id="modeZone" data-mode="zone" title="วาดโซน / VLAN (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>วาดโซน</button>
+    </div>
+    <div class="sep hide-sm"></div>
+    <div class="grp">
+      <button class="btn" id="undoBtn" title="ย้อนกลับ (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/></svg><span class="hide-sm">ย้อน</span></button>
+      <button class="btn" id="redoBtn" title="ทำซ้ำ (Ctrl+Y)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 7 5 5-5 5"/><path d="M20 12H10a6 6 0 0 0 0 12"/></svg><span class="hide-sm">ทำซ้ำ</span></button>
+    </div>
+    <div class="spacer"></div>
+    <span class="server-pill" id="serverPill" title=""><i></i><span>บันทึกในเบราว์เซอร์</span></span>
+    <div class="grp">
+      <button class="btn" id="filesBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>ผังทั้งหมด</button>
+      <button class="btn" id="jsonBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H7a2 2 0 0 0-2 2v4l-2 2 2 2v4a2 2 0 0 0 2 2h1M16 4h1a2 2 0 0 1 2 2v4l2 2-2 2v4a2 2 0 0 1-2 2h-1"/></svg>เปิด/บันทึก JSON</button>
+      <select id="exportSel" class="sel-sm" aria-label="ส่งออก">
+        <option value="">ส่งออก…</option>
+        <option value="png">รูปภาพ PNG</option>
+        <option value="svg">รูปภาพ SVG</option>
+        <option value="csv">รายการอุปกรณ์ CSV</option>
+        <option value="json">ไฟล์ผัง JSON</option>
+      </select>
+      <button class="btn danger" id="newBtn" title="เริ่มผังใหม่">ผังใหม่</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside class="palette" id="palette" aria-label="อุปกรณ์"></aside>
+    <section class="stage" id="stage">
+      <svg id="canvas" class="mode-select" aria-label="พื้นที่วาดผังเครือข่าย">
+        <defs>
+          <pattern id="gridDots" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="1" fill="var(--grid)"/>
+          </pattern>
+        </defs>
+        <rect id="bgRect" x="-50000" y="-50000" width="100000" height="100000" fill="url(#gridDots)"/>
+        <g id="world"></g>
+      </svg>
+      <div class="hint" id="hint"></div>
+      <div class="zoomctl">
+        <button class="btn" id="zoomOut" title="ซูมออก" aria-label="ซูมออก">−</button>
+        <span id="zoomVal">100%</span>
+        <button class="btn" id="zoomIn" title="ซูมเข้า" aria-label="ซูมเข้า">+</button>
+        <button class="btn" id="zoomFit" title="พอดีจอ">พอดีจอ</button>
+      </div>
+    </section>
+    <aside class="inspector" id="inspector" aria-label="รายละเอียด"></aside>
+  </div>
+</div>
+
+<div class="overlay" id="jsonModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jsonTitle">
+    <h2 id="jsonTitle">เปิด / บันทึกผังเป็น JSON</h2>
+    <p class="muted" style="margin:0">ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”</p>
+    <textarea id="jsonText" spellcheck="false" aria-label="ข้อมูล JSON"></textarea>
+    <div class="actions" style="margin:0">
+      <button class="btn primary" id="jsonLoad">โหลดจากข้อความนี้</button>
+      <button class="btn" id="jsonCopy">คัดลอก</button>
+      <button class="btn" id="jsonSave">บันทึกเป็นไฟล์</button>
+      <label class="btn" for="jsonFile">เปิดไฟล์ .json…</label>
+      <input type="file" id="jsonFile" accept=".json,application/json" hidden>
+      <div class="spacer"></div>
+      <button class="btn" data-close>ปิด</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="filesModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="filesTitle">
+    <h2 id="filesTitle">ผังที่บันทึกไว้บนเซิร์ฟเวอร์</h2>
+    <div class="list" id="filesList"></div>
+    <div class="actions" style="margin:0">
+      <button class="btn primary" id="filesNew">สร้างผังใหม่</button>
+      <div class="spacer"></div>
+      <button class="btn" data-close>ปิด</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------- Catalog ---------- */
+const CATS = {
+  edge:     { label: "WAN / ขอบเครือข่าย", color: "#3a5a99" },
+  security: { label: "ความปลอดภัย", color: "#c2462b" },
+  network:  { label: "สวิตช์ / เครือข่าย", color: "#1b7a8c" },
+  wireless: { label: "ไร้สาย", color: "#7a4fb8" },
+  compute:  { label: "เซิร์ฟเวอร์ / จัดเก็บข้อมูล", color: "#2f7a4c" },
+  endpoint: { label: "อุปกรณ์ปลายทาง", color: "#5a6472" },
+  facility: { label: "ระบบสนับสนุน", color: "#9a6b1a" },
+};
+const G = {
+  internet: '<path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.4 4.3 4.3 0 0 0 7 18z"/>',
+  router: '<circle cx="12" cy="12" r="8.5"/><path d="M12 6.5v4M10.5 8 12 6.5 13.5 8M12 17.5v-4M10.5 16 12 17.5l1.5-1.5M6.5 12h4M8 10.5 6.5 12 8 13.5M17.5 12h-4M16 10.5l1.5 1.5-1.5 1.5"/>',
+  firewall: '<rect x="3.5" y="5" width="17" height="14" rx="1"/><path d="M3.5 9.7h17M3.5 14.3h17M9 5v4.7M15 5v4.7M6.5 9.7v4.6M12 9.7v4.6M17.5 9.7v4.6M9 14.3V19M15 14.3V19"/>',
+  loadbalancer: '<circle cx="5.5" cy="12" r="2.2"/><circle cx="18.5" cy="5.5" r="2.2"/><circle cx="18.5" cy="12" r="2.2"/><circle cx="18.5" cy="18.5" r="2.2"/><path d="M7.7 12h8.6M7.5 11 16.4 6.5M7.5 13l8.9 4.5"/>',
+  coreswitch: '<rect x="3" y="9" width="18" height="10" rx="1.5"/><path d="M5 9V6h14v3"/><path d="M7 12.5h9l-1.8-1.6M17 15.5H8l1.8 1.6"/>',
+  switch: '<rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 10.5h9l-1.8-1.6M17 13.5H8l1.8 1.6"/>',
+  ap: '<path d="M4 15h16v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8.8 10.4a4.6 4.6 0 0 1 6.4 0M6.3 7.8a8.2 8.2 0 0 1 11.4 0"/><circle cx="12" cy="12.6" r=".9" fill="#fff"/>',
+  server: '<rect x="5" y="3.5" width="14" height="5" rx="1"/><rect x="5" y="9.5" width="14" height="5" rx="1"/><rect x="5" y="15.5" width="14" height="5" rx="1"/><path d="M8 6h.01M8 12h.01M8 18h.01M12 6h4M12 12h4M12 18h4"/>',
+  database: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
+  storage: '<rect x="3.5" y="6" width="17" height="12" rx="1.5"/><path d="M7 9v6M10 9v6M13 9v6M17 15h.01"/>',
+  pc: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/>',
+  laptop: '<rect x="5" y="5" width="14" height="10" rx="1"/><path d="M2.5 19h19l-2-4h-15z"/>',
+  printer: '<path d="M7 9V4h10v5"/><rect x="3.5" y="9" width="17" height="7" rx="1.5"/><path d="M7 14h10v6H7z"/>',
+  phone: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 6h8v4H8zM8.5 13h.01M12 13h.01M15.5 13h.01M8.5 16.5h.01M12 16.5h.01M15.5 16.5h.01"/>',
+  camera: '<path d="M3 8.5 15.5 5l1.6 6L4.6 14.5z"/><path d="M17 8.3l3.5-1v5l-3 .9"/><path d="M8.5 13.3V18H4"/>',
+  ups: '<rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M12.8 7 10 12h4l-2.8 5"/>',
+};
+const TYPES = {
+  internet:     { label: "Internet / Cloud", cat: "edge",     extra: ["isp", "circuit", "bandwidth"] },
+  router:       { label: "Router",           cat: "edge",     extra: ["wanIp", "ports", "routing"] },
+  firewall:     { label: "Firewall",         cat: "security", extra: ["ha", "policyZones", "license"] },
+  loadbalancer: { label: "Load Balancer",    cat: "network",  extra: ["vip", "pool"] },
+  coreswitch:   { label: "Core Switch (L3)", cat: "network",  extra: ["ports", "uplink", "stack"] },
+  switch:       { label: "Switch",           cat: "network",  extra: ["ports", "poe", "uplink"] },
+  ap:           { label: "Access Point",     cat: "wireless", extra: ["ssid", "band", "channel", "controller"] },
+  server:       { label: "Server",           cat: "compute",  extra: ["role", "cpu", "ram", "disk"] },
+  database:     { label: "Database",         cat: "compute",  extra: ["dbEngine", "svcPort", "disk"] },
+  storage:      { label: "NAS / Storage",    cat: "compute",  extra: ["capacity", "raid", "protocol"] },
+  pc:           { label: "PC",               cat: "endpoint", extra: ["user", "dept"] },
+  laptop:       { label: "Laptop",           cat: "endpoint", extra: ["user", "dept"] },
+  printer:      { label: "Printer",          cat: "endpoint", extra: ["dept"] },
+  phone:        { label: "IP Phone",         cat: "endpoint", extra: ["ext", "user"] },
+  camera:       { label: "กล้อง CCTV",        cat: "endpoint", extra: ["resolution", "nvr"] },
+  ups:          { label: "UPS",              cat: "facility", extra: ["va", "runtime"] },
+};
+const EXTRA_LABELS = {
+  isp: "ผู้ให้บริการ (ISP)", circuit: "Circuit ID", bandwidth: "แบนด์วิดท์", wanIp: "WAN IP", ports: "จำนวนพอร์ต",
+  routing: "Routing protocol", ha: "High Availability", policyZones: "Security zones", license: "License หมดอายุ",
+  vip: "Virtual IP", pool: "Server pool", uplink: "Uplink", stack: "Stack / VSS", poe: "PoE", ssid: "SSID",
+  band: "ย่านความถี่", channel: "Channel", controller: "Controller", role: "บทบาท / บริการ", cpu: "CPU", ram: "RAM",
+  disk: "Storage", dbEngine: "Database engine", svcPort: "Service port", capacity: "ความจุ", raid: "RAID",
+  protocol: "Protocol", user: "ผู้ใช้งาน", dept: "แผนก", ext: "เบอร์ภายใน", resolution: "ความละเอียด", nvr: "NVR",
+  va: "ขนาด (VA)", runtime: "Runtime",
+};
+const MONO_FIELDS = new Set(["ip", "mask", "gateway", "mac", "vlan", "serial", "wanIp", "vip", "circuit", "svcPort", "ports", "channel", "ext"]);
+const STATUS = {
+  active: { label: "ใช้งานอยู่", color: "#2f9e5a" },
+  planned: { label: "วางแผน / ยังไม่ติดตั้ง", color: "#3b7ddd" },
+  maint: { label: "ซ่อมบำรุง", color: "#e0a019" },
+  down: { label: "ใช้งานไม่ได้", color: "#d64535" },
+};
+const LINKS = {
+  eth:   { label: "Ethernet (UTP)", color: null,      width: 2,   dash: "" },
+  fiber: { label: "Fiber",          color: "#d97706", width: 3,   dash: "" },
+  wan:   { label: "WAN / Leased line", color: "#c2462b", width: 2.5, dash: "12 4 2 4" },
+  vpn:   { label: "VPN / Tunnel",   color: "#3b62c9", width: 2,   dash: "8 5" },
+  wifi:  { label: "Wireless",       color: "#7a4fb8", width: 2,   dash: "2 5" },
+  stack: { label: "Stack / HA",     color: "#2f7a4c", width: 4.5, dash: "" },
+};
+const ZONE_COLORS = { blue: "#3b62c9", green: "#2f8a55", red: "#c2462b", amber: "#c98a0b", violet: "#7a4fb8", slate: "#5a6472" };
+const ZONE_COLOR_LABELS = { blue: "น้ำเงิน", green: "เขียว", red: "แดง", amber: "เหลืองอำพัน", violet: "ม่วง", slate: "เทา" };
+
+/* ---------- Sample ---------- */
+function sample() {
+  const n = (id, type, x, y, f = {}) => ({ id, type, x, y, name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [], ...f });
+  const l = (from, to, kind, f = {}) => ({ id: "l_" + from + "_" + to, from, to, kind, label: "", fromPort: "", toPort: "", notes: "", ...f });
+  return {
+    version: 1,
+    title: "ตัวอย่าง · เครือข่ายสำนักงานสาขา",
+    nodes: [
+      n("inet", "internet", 460, 60, { name: "Internet", extra: { isp: "NT Broadband", bandwidth: "1 Gbps / 500 Mbps", circuit: "BKK-FTTx-20931" } }),
+      n("rt1", "router", 460, 200, { name: "RT-EDGE-01", ip: "203.0.113.2", mask: "/30", vendor: "Cisco", model: "ISR 1111", location: "ห้อง Server ชั้น 1 · Rack A U40", extra: { wanIp: "203.0.113.2/30", routing: "Static + BGP" } }),
+      n("fw1", "firewall", 460, 340, { name: "FW-01", ip: "10.0.0.1", mask: "255.255.255.0", vendor: "Fortinet", model: "FortiGate 100F", os: "FortiOS 7.4", serial: "FG100FTK2390xxxx", location: "Rack A U38", extra: { ha: "Active-Passive กับ FW-02", policyZones: "WAN, DMZ, LAN", license: "2027-03-31" } }),
+      n("web1", "server", 740, 340, { name: "WEB-01", ip: "172.16.10.10", mask: "/24", gateway: "172.16.10.1", vendor: "Dell", model: "PowerEdge R650", os: "Ubuntu 24.04", location: "Rack A U20", extra: { role: "เว็บไซต์องค์กร (Nginx)", cpu: "2× Xeon Silver 4314", ram: "64 GB" } }),
+      n("core", "coreswitch", 460, 490, { name: "CORE-SW-01", ip: "10.0.0.2", mask: "/24", vendor: "Aruba", model: "CX 6300M", location: "Rack A U36", extra: { ports: "48× 1G + 4× 25G", stack: "VSF 2 ตัว" } }),
+      n("dc1", "server", 90, 650, { name: "DC-01", ip: "10.0.20.10", mask: "/24", gateway: "10.0.20.1", vlan: "20", os: "Windows Server 2022", extra: { role: "AD / DNS / DHCP" } }),
+      n("db1", "database", 200, 650, { name: "DB-01", ip: "10.0.20.20", mask: "/24", gateway: "10.0.20.1", vlan: "20", extra: { dbEngine: "PostgreSQL 16", svcPort: "5432" } }),
+      n("nas1", "storage", 310, 650, { name: "NAS-01", ip: "10.0.20.30", mask: "/24", vlan: "20", vendor: "Synology", model: "RS1221+", extra: { capacity: "32 TB", raid: "RAID 6", protocol: "SMB / iSCSI" } }),
+      n("sw1", "switch", 520, 680, { name: "SW-FL1", ip: "10.0.0.11", mask: "/24", vlan: "30", vendor: "Aruba", model: "CX 6100 24G PoE", location: "ตู้ Rack ชั้น 1", extra: { ports: "24", poe: "370 W", uplink: "10G SFP+ → CORE" } }),
+      n("sw2", "switch", 790, 680, { name: "SW-FL2", ip: "10.0.0.12", mask: "/24", vlan: "40", vendor: "Aruba", model: "CX 6100 24G PoE", location: "ตู้ Rack ชั้น 2", extra: { ports: "24", poe: "370 W", uplink: "10G SFP+ → CORE" } }),
+      n("ap1", "ap", 460, 840, { name: "AP-FL1-01", ip: "10.0.30.21", vlan: "30", vendor: "Aruba", model: "AP-515", extra: { ssid: "Office, Guest", band: "2.4 / 5 GHz", channel: "36" } }),
+      n("pc1", "pc", 580, 840, { name: "PC-ACC-01", ip: "10.0.30.101", vlan: "30", extra: { user: "ฝ่ายบัญชี", dept: "บัญชี" } }),
+      n("lap1", "laptop", 460, 990, { name: "NB-HR-03", ip: "DHCP", vlan: "30", status: "planned", extra: { user: "ฝ่ายบุคคล" } }),
+      n("ap2", "ap", 720, 840, { name: "AP-FL2-01", ip: "10.0.40.21", vlan: "40", vendor: "Aruba", model: "AP-515", extra: { ssid: "Office, Guest", band: "2.4 / 5 GHz", channel: "44" } }),
+      n("prn1", "printer", 840, 840, { name: "PRN-FL2", ip: "10.0.40.50", vlan: "40", model: "HP LaserJet M507" }),
+      n("cam1", "camera", 960, 840, { name: "CAM-LOBBY", ip: "10.0.40.80", vlan: "40", status: "maint", extra: { resolution: "4 MP", nvr: "NVR-01" } }),
+    ],
+    links: [
+      l("inet", "rt1", "wan", { label: "1 Gbps FTTx" }),
+      l("rt1", "fw1", "eth", { fromPort: "Gi0/0/1", toPort: "wan1" }),
+      l("fw1", "web1", "eth", { label: "DMZ", fromPort: "port3", toPort: "eno1" }),
+      l("fw1", "core", "fiber", { label: "10G", fromPort: "x1", toPort: "1/1/49" }),
+      l("core", "dc1", "eth"),
+      l("core", "db1", "eth"),
+      l("core", "nas1", "fiber", { label: "10G iSCSI" }),
+      l("core", "sw1", "fiber", { label: "10G", toPort: "1/1/25" }),
+      l("core", "sw2", "fiber", { label: "10G", toPort: "1/1/25" }),
+      l("sw1", "ap1", "eth", { fromPort: "1/1/1" }),
+      l("sw1", "pc1", "eth", { fromPort: "1/1/10" }),
+      l("ap1", "lap1", "wifi", { label: "SSID Office" }),
+      l("sw2", "ap2", "eth", { fromPort: "1/1/1" }),
+      l("sw2", "prn1", "eth", { fromPort: "1/1/12" }),
+      l("sw2", "cam1", "eth", { fromPort: "1/1/20" }),
+    ],
+    zones: [
+      { id: "z_dmz", x: 650, y: 270, w: 180, h: 160, name: "DMZ · 172.16.10.0/24", color: "red", notes: "" },
+      { id: "z_srv", x: 30, y: 580, w: 340, h: 150, name: "Server Farm · VLAN 20", color: "green", notes: "" },
+      { id: "z_lan", x: 400, y: 610, w: 620, h: 450, name: "สำนักงาน ชั้น 1–2 · VLAN 30 / 40", color: "blue", notes: "" },
+    ],
+  };
+}
+
+/* ---------- State ---------- */
+const LS_KEY = "netplan.v1";
+let doc = null;
+let docId = null;            // server id when running with backend
+let sel = null;              // {kind:'node'|'link'|'zone', id}
+let mode = "select";
+let pendingFrom = null;
+let view = { x: 0, y: 0, k: 1 };
+let drag = null;
+let undoStack = [], redoStack = [];
+let server = false;
+
+const $ = (s) => document.querySelector(s);
+const svg = $("#canvas"), world = $("#world"), inspector = $("#inspector");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = (p) => p + "_" + Math.random().toString(36).slice(2, 9);
+const snap = (v) => Math.round(v / 10) * 10;
+const findNode = (id) => doc.nodes.find((n) => n.id === id);
+const findLink = (id) => doc.links.find((l) => l.id === id);
+const findZone = (id) => doc.zones.find((z) => z.id === id);
+
+function normalize(d) {
+  if (!d || typeof d !== "object" || !Array.isArray(d.nodes)) throw new Error("ไม่พบรายการอุปกรณ์ (nodes) ในไฟล์");
+  const out = { version: 1, title: String(d.title || "ผังเครือข่าย"), nodes: [], links: [], zones: [] };
+  for (const n of d.nodes) {
+    if (!n || !n.id) continue;
+    out.nodes.push({ name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", os: "", location: "", status: "active", notes: "",
+      ...n, type: TYPES[n.type] ? n.type : "server", x: +n.x || 0, y: +n.y || 0, extra: { ...(n.extra || {}) }, custom: Array.isArray(n.custom) ? n.custom.map((c) => ({ k: String(c.k ?? ""), v: String(c.v ?? "") })) : [] });
+  }
+  const ids = new Set(out.nodes.map((n) => n.id));
+  for (const l of d.links || []) {
+    if (!l || !ids.has(l.from) || !ids.has(l.to)) continue;
+    out.links.push({ label: "", fromPort: "", toPort: "", notes: "", ...l, id: l.id || uid("l"), kind: LINKS[l.kind] ? l.kind : "eth" });
+  }
+  for (const z of d.zones || []) {
+    if (!z) continue;
+    out.zones.push({ name: "", notes: "", ...z, id: z.id || uid("z"), x: +z.x || 0, y: +z.y || 0, w: Math.max(60, +z.w || 200), h: Math.max(40, +z.h || 120), color: ZONE_COLORS[z.color] ? z.color : "blue" });
+  }
+  return out;
+}
+
+/* ---------- History ---------- */
+function checkpoint() {
+  undoStack.push(JSON.stringify(doc));
+  if (undoStack.length > 120) undoStack.shift();
+  redoStack = [];
+  updateUndoButtons();
+}
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(JSON.stringify(doc));
+  doc = JSON.parse(undoStack.pop());
+  afterDocSwap();
+}
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(JSON.stringify(doc));
+  doc = JSON.parse(redoStack.pop());
+  afterDocSwap();
+}
+function afterDocSwap() {
+  if (sel && !(sel.kind === "node" ? findNode(sel.id) : sel.kind === "link" ? findLink(sel.id) : findZone(sel.id))) sel = null;
+  $("#docTitle").value = doc.title;
+  render(); renderInspector(); updateUndoButtons(); persist();
+}
+function updateUndoButtons() {
+  $("#undoBtn").disabled = !undoStack.length;
+  $("#redoBtn").disabled = !redoStack.length;
+}
+
+/* ---------- Persistence ---------- */
+let saveTimer = null;
+function persist() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId })); } catch (e) {}
+    if (server && docId) {
+      try {
+        const r = await fetch("api/diagrams/" + encodeURIComponent(docId), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) });
+        setPill(r.ok ? "บันทึกบนเซิร์ฟเวอร์แล้ว" : "บันทึกไม่สำเร็จ (" + r.status + ")", r.ok);
+      } catch (e) { setPill("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", false); }
+    }
+  }, 600);
+}
+function setPill(text, on) {
+  const p = $("#serverPill");
+  p.classList.toggle("on", !!on);
+  p.querySelector("span").textContent = text;
+}
+async function detectServer() {
+  try {
+    const r = await fetch("api/health", { cache: "no-store" });
+    if (!r.ok) return false;
+    const j = await r.json();
+    return j && j.app === "netplan";
+  } catch (e) { return false; }
+}
+
+/* ---------- Geometry ---------- */
+function toWorld(e) {
+  const r = svg.getBoundingClientRect();
+  return { x: (e.clientX - r.left - view.x) / view.k, y: (e.clientY - r.top - view.y) / view.k };
+}
+function applyView() {
+  world.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.k})`);
+  $("#bgRect").setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.k})`);
+  $("#zoomVal").textContent = Math.round(view.k * 100) + "%";
+}
+function zoomAt(factor, cx, cy) {
+  const k = Math.min(3, Math.max(0.2, view.k * factor));
+  view.x = cx - (cx - view.x) * (k / view.k);
+  view.y = cy - (cy - view.y) * (k / view.k);
+  view.k = k; applyView();
+}
+function bbox(d = doc) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of d.nodes) { x0 = Math.min(x0, n.x - 70); x1 = Math.max(x1, n.x + 70); y0 = Math.min(y0, n.y - 40); y1 = Math.max(y1, n.y + 68); }
+  for (const z of d.zones) { x0 = Math.min(x0, z.x); y0 = Math.min(y0, z.y - 6); x1 = Math.max(x1, z.x + z.w); y1 = Math.max(y1, z.y + z.h); }
+  if (!isFinite(x0)) return { x: 0, y: 0, w: 800, h: 500 };
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+function fit() {
+  const r = svg.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const b = bbox(), pad = 40;
+  const k = Math.min(1.4, Math.max(0.2, Math.min((r.width - pad * 2) / b.w, (r.height - pad * 2) / b.h)));
+  view.k = k;
+  view.x = (r.width - b.w * k) / 2 - b.x * k;
+  view.y = (r.height - b.h * k) / 2 - b.y * k;
+  applyView();
+}
+
+/* ---------- Rendering ---------- */
+function glyph(type, size = 32, x = -16, y = -16) {
+  const s = size / 24;
+  return `<g transform="translate(${x} ${y}) scale(${s})" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${G[type]}</g>`;
+}
+function iconTile(type, px) {
+  const c = CATS[TYPES[type].cat].color;
+  return `<span class="tile" style="background:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${G[type]}</svg></span>`;
+}
+function diagramMarkup(opts = {}) {
+  const exp = !!opts.export;
+  let out = "";
+  // zones
+  for (const z of doc.zones) {
+    const c = ZONE_COLORS[z.color];
+    const isSel = !exp && sel && sel.kind === "zone" && sel.id === z.id;
+    out += `<g data-kind="zone" data-id="${z.id}">`;
+    out += `<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="12" fill="${c}" fill-opacity=".07" stroke="${c}" stroke-opacity=".75" stroke-width="${isSel ? 2.5 : 1.5}" stroke-dasharray="7 5" style="cursor:move"/>`;
+    out += `<text class="zlabel" x="${z.x + 12}" y="${z.y + 22}" fill="${c}" style="cursor:move">${esc(z.name || "โซน")}</text>`;
+    out += `</g>`;
+    if (isSel) out += `<rect data-kind="zone-resize" data-id="${z.id}" x="${z.x + z.w - 9}" y="${z.y + z.h - 9}" width="16" height="16" rx="3" fill="var(--panel)" stroke="${c}" stroke-width="2" style="cursor:nwse-resize"/>`;
+  }
+  // links
+  const pairs = {};
+  for (const l of doc.links) { const k = [l.from, l.to].sort().join("|"); (pairs[k] ||= []).push(l.id); }
+  for (const l of doc.links) {
+    const a = findNode(l.from), b = findNode(l.to);
+    if (!a || !b) continue;
+    const k = [l.from, l.to].sort().join("|"), grp = pairs[k], idx = grp.indexOf(l.id);
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len, px = -uy, py = ux;
+    const sign = l.from < l.to ? 1 : -1;
+    const off = (idx - (grp.length - 1) / 2) * 14 * sign;
+    const x1 = a.x + px * off, y1 = a.y + py * off, x2 = b.x + px * off, y2 = b.y + py * off;
+    const t = LINKS[l.kind] || LINKS.eth;
+    const col = t.color || (exp ? "#6b7684" : "var(--link)");
+    const isSel = !exp && sel && sel.kind === "link" && sel.id === l.id;
+    out += `<g data-kind="link" data-id="${l.id}">`;
+    if (isSel) out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--sel)" stroke-opacity=".45" stroke-width="${t.width + 7}" stroke-linecap="round"/>`;
+    out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round"/>`;
+    if (!exp) out += `<line class="hit" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    // keep text clear of the tile and of the name/IP printed below each node
+    const clear = (dirY) => 40 + (dirY > 0 ? 34 * dirY : 0);
+    const d1 = Math.min(len * 0.4, clear(uy)), d2 = Math.min(len * 0.4, clear(-uy));
+    const mx = (x1 + ux * d1 + x2 - ux * d2) / 2, my = (y1 + uy * d1 + y2 - uy * d2) / 2;
+    if (l.label) out += `<text class="llabel" x="${mx}" y="${my + 4}" text-anchor="middle">${esc(l.label)}</text>`;
+    if (len > 150) {
+      if (l.fromPort) out += `<text class="lport" x="${x1 + ux * d1}" y="${y1 + uy * d1 + 3}" text-anchor="middle">${esc(l.fromPort)}</text>`;
+      if (l.toPort) out += `<text class="lport" x="${x2 - ux * d2}" y="${y2 - uy * d2 + 3}" text-anchor="middle">${esc(l.toPort)}</text>`;
+    }
+    out += `</g>`;
+  }
+  // nodes
+  for (const n of doc.nodes) {
+    const c = CATS[TYPES[n.type].cat].color;
+    const isSel = !exp && sel && sel.kind === "node" && sel.id === n.id;
+    const isPend = !exp && pendingFrom === n.id;
+    const planned = n.status === "planned";
+    out += `<g class="node" data-kind="node" data-id="${n.id}" transform="translate(${n.x} ${n.y})"${planned ? ' opacity=".7"' : ""}>`;
+    if (isSel || isPend) out += `<rect class="ring" x="-33" y="-33" width="66" height="66" rx="14"${isPend ? ' stroke-dasharray="5 4"' : ""}/>`;
+    out += `<rect x="-26" y="-26" width="52" height="52" rx="11" fill="${c}"${planned ? ` fill-opacity=".55" stroke="${c}" stroke-width="2" stroke-dasharray="5 3"` : ""}/>`;
+    out += glyph(n.type, 32, -16, -16);
+    const st = STATUS[n.status];
+    if (st && n.status !== "active") out += `<circle class="statdot" cx="22" cy="-22" r="5.5" fill="${st.color}"/>`;
+    out += `<text class="nlabel" y="44" text-anchor="middle">${esc(n.name || TYPES[n.type].label)}</text>`;
+    const sub = n.ip || (n.vlan ? "VLAN " + n.vlan : "");
+    if (sub) out += `<text class="nip" y="59" text-anchor="middle">${esc(sub)}</text>`;
+    out += `</g>`;
+  }
+  return out;
+}
+let raf = 0;
+function render() {
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(() => {
+    let temp = "";
+    if (drag && drag.type === "link") {
+      const a = findNode(drag.from);
+      temp = `<line x1="${a.x}" y1="${a.y}" x2="${drag.cx}" y2="${drag.cy}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>`;
+    }
+    if (drag && drag.type === "newzone") {
+      const r = normRect(drag);
+      temp = `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12" fill="var(--accent)" fill-opacity=".08" stroke="var(--accent)" stroke-dasharray="7 5" pointer-events="none"/>`;
+    }
+    world.innerHTML = diagramMarkup() + temp;
+  });
+}
+function normRect(d) {
+  return { x: Math.min(d.x0, d.x1), y: Math.min(d.y0, d.y1), w: Math.abs(d.x1 - d.x0), h: Math.abs(d.y1 - d.y0) };
+}
+
+/* ---------- Palette ---------- */
+function buildPalette() {
+  const p = $("#palette");
+  let h = "";
+  for (const [ck, c] of Object.entries(CATS)) {
+    const items = Object.entries(TYPES).filter(([, t]) => t.cat === ck);
+    if (!items.length) continue;
+    h += `<h3>${esc(c.label)}</h3><div class="pal-list">`;
+    for (const [k, t] of items) h += `<button class="pal-item" draggable="true" data-type="${k}" title="คลิกเพื่อเพิ่ม หรือลากไปวางบนผัง">${iconTile(k)}<span>${esc(t.label)}</span></button>`;
+    h += `</div>`;
+  }
+  h += `<p class="pal-hint">คลิกเพื่อเพิ่มกลางจอ หรือลากอุปกรณ์ไปวางตรงตำแหน่งที่ต้องการ</p>`;
+  p.innerHTML = h;
+  p.addEventListener("click", (e) => {
+    const b = e.target.closest(".pal-item"); if (!b) return;
+    const r = svg.getBoundingClientRect();
+    const cx = (r.width / 2 - view.x) / view.k, cy = (r.height / 2 - view.y) / view.k;
+    const jitter = (doc.nodes.length % 5) * 20;
+    addNode(b.dataset.type, snap(cx + jitter), snap(cy + jitter));
+  });
+  p.addEventListener("dragstart", (e) => {
+    const b = e.target.closest(".pal-item"); if (!b) return;
+    e.dataTransfer.setData("text/netplan-type", b.dataset.type);
+    e.dataTransfer.effectAllowed = "copy";
+  });
+  const stage = $("#stage");
+  stage.addEventListener("dragover", (e) => { if ([...e.dataTransfer.types].includes("text/netplan-type")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
+  stage.addEventListener("drop", (e) => {
+    const t = e.dataTransfer.getData("text/netplan-type"); if (!t) return;
+    e.preventDefault();
+    const p = toWorld(e); addNode(t, snap(p.x), snap(p.y));
+  });
+}
+function nextName(type) {
+  const base = { internet: "Internet", router: "RT", firewall: "FW", loadbalancer: "LB", coreswitch: "CORE-SW", switch: "SW", ap: "AP", server: "SRV", database: "DB", storage: "NAS", pc: "PC", laptop: "NB", printer: "PRN", phone: "PHONE", camera: "CAM", ups: "UPS" }[type];
+  if (type === "internet") return base;
+  let i = 1; const names = new Set(doc.nodes.map((n) => n.name));
+  while (names.has(`${base}-${String(i).padStart(2, "0")}`)) i++;
+  return `${base}-${String(i).padStart(2, "0")}`;
+}
+function addNode(type, x, y) {
+  checkpoint();
+  const n = { id: uid("n"), type, x, y, name: nextName(type), ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [] };
+  doc.nodes.push(n);
+  sel = { kind: "node", id: n.id };
+  render(); renderInspector(); persist();
+}
+
+/* ---------- Inspector ---------- */
+function field(label, key, val, o = {}) {
+  const id = "f_" + key.replace(/[^a-z0-9]/gi, "_");
+  const cls = (o.full ? "f full" : "f");
+  const mono = MONO_FIELDS.has(key.replace(/^extra\./, "")) ? " mono" : "";
+  if (o.type === "select") {
+    return `<div class="${cls}"><label for="${id}">${esc(label)}</label><select id="${id}" data-field="${key}">${o.options.map(([v, t]) => `<option value="${esc(v)}"${v === val ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div>`;
+  }
+  if (o.type === "textarea") return `<div class="${cls}"><label for="${id}">${esc(label)}</label><textarea id="${id}" data-field="${key}" rows="3">${esc(val)}</textarea></div>`;
+  return `<div class="${cls}"><label for="${id}">${esc(label)}</label><input id="${id}" class="${mono.trim()}" data-field="${key}" value="${esc(val)}"${o.ph ? ` placeholder="${esc(o.ph)}"` : ""} autocomplete="off" spellcheck="false"></div>`;
+}
+const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+function renderInspector() {
+  let h = "";
+  if (sel && sel.kind === "node") {
+    const n = findNode(sel.id), t = TYPES[n.type];
+    const linked = doc.links.filter((l) => l.from === n.id || l.to === n.id);
+    h += `<div class="insp-head">${iconTile(n.type)}<div><h2>${esc(n.name || t.label)}</h2><small>${esc(t.label)} · ${esc(CATS[t.cat].label)}</small></div></div>`;
+    h += `<div class="sec">ข้อมูลหลัก</div><div class="fields">`;
+    h += field("ชื่ออุปกรณ์ / Hostname", "name", n.name, { full: true });
+    h += field("ชนิดอุปกรณ์", "type", n.type, { type: "select", options: Object.entries(TYPES).map(([k, v]) => [k, v.label]) });
+    h += field("สถานะ", "status", n.status, { type: "select", options: Object.entries(STATUS).map(([k, v]) => [k, v.label]) });
+    h += `</div><div class="sec">เครือข่าย</div><div class="fields">`;
+    h += field("IP Address", "ip", n.ip, { ph: "10.0.0.10" });
+    h += field("Subnet / Mask", "mask", n.mask, { ph: "/24" });
+    h += field("Gateway", "gateway", n.gateway, { ph: "10.0.0.1" });
+    h += field("VLAN", "vlan", n.vlan, { ph: "10" });
+    h += field("MAC Address", "mac", n.mac, { full: true, ph: "00:1A:2B:3C:4D:5E" });
+    h += `</div><div class="sec">ฮาร์ดแวร์</div><div class="fields">`;
+    h += field("ยี่ห้อ", "vendor", n.vendor);
+    h += field("รุ่น", "model", n.model);
+    h += field("Serial No.", "serial", n.serial);
+    h += field("OS / Firmware", "os", n.os);
+    h += field("ตำแหน่งติดตั้ง / Rack", "location", n.location, { full: true });
+    h += `</div><div class="sec">เฉพาะ ${esc(t.label)}</div><div class="fields">`;
+    for (const k of t.extra) h += field(EXTRA_LABELS[k] || k, "extra." + k, n.extra[k] || "");
+    h += `</div><div class="sec">ฟิลด์เพิ่มเติม</div><div id="customRows">`;
+    n.custom.forEach((c, i) => {
+      h += `<div class="custom-row"><input aria-label="ชื่อฟิลด์" placeholder="ชื่อฟิลด์" data-custom="${i}" data-part="k" value="${esc(c.k)}"><input aria-label="ค่า" placeholder="ค่า" data-custom="${i}" data-part="v" value="${esc(c.v)}"><button class="icon-btn" data-custom-del="${i}" title="ลบฟิลด์" aria-label="ลบฟิลด์">${ICON_X}</button></div>`;
+    });
+    h += `</div><button class="btn" id="addCustom">+ เพิ่มฟิลด์</button>`;
+    h += `<div class="sec">หมายเหตุ</div><div class="fields">${field("บันทึก", "notes", n.notes, { type: "textarea", full: true })}</div>`;
+    if (linked.length) {
+      h += `<div class="sec">การเชื่อมต่อ (${linked.length})</div><div class="list">`;
+      for (const l of linked) {
+        const other = findNode(l.from === n.id ? l.to : l.from);
+        const myPort = l.from === n.id ? l.fromPort : l.toPort, otherPort = l.from === n.id ? l.toPort : l.fromPort;
+        h += `<button class="btn" data-goto-link="${l.id}" style="justify-content:space-between;width:100%"><span>${esc(myPort || "—")} → ${esc(other.name)}${otherPort ? " (" + esc(otherPort) + ")" : ""}</span><span class="muted">${esc(LINKS[l.kind].label)}</span></button>`;
+      }
+      h += `</div>`;
+    }
+    h += `<div class="actions"><button class="btn" id="dupBtn">ทำสำเนา <span class="kbd">Ctrl+D</span></button><button class="btn" id="connectFromBtn">เชื่อมสายจากอุปกรณ์นี้</button><button class="btn danger" id="delBtn">ลบอุปกรณ์ <span class="kbd">Del</span></button></div>`;
+  } else if (sel && sel.kind === "link") {
+    const l = findLink(sel.id), a = findNode(l.from), b = findNode(l.to);
+    h += `<div class="insp-head"><span class="tile" style="background:var(--panel-2);border:1px solid var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg></span><div><h2>${esc(a.name)} ↔ ${esc(b.name)}</h2><small>สายเชื่อมต่อ</small></div></div>`;
+    h += `<div class="fields">`;
+    h += field("ชนิดสาย", "kind", l.kind, { type: "select", full: true, options: Object.entries(LINKS).map(([k, v]) => [k, v.label]) });
+    h += field("ป้ายบนสาย (ความเร็ว, VLAN)", "label", l.label, { full: true, ph: "1G, Trunk VLAN 10–40" });
+    h += field("พอร์ตฝั่ง " + (a.name || "A"), "fromPort", l.fromPort, { ph: "Gi1/0/1" });
+    h += field("พอร์ตฝั่ง " + (b.name || "B"), "toPort", l.toPort, { ph: "port1" });
+    h += field("หมายเหตุ", "notes", l.notes, { type: "textarea", full: true });
+    h += `</div><div class="actions"><button class="btn" id="swapBtn">สลับฝั่ง</button><button class="btn danger" id="delBtn">ลบสาย</button></div>`;
+  } else if (sel && sel.kind === "zone") {
+    const z = findZone(sel.id);
+    const inside = doc.nodes.filter((n) => n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h);
+    h += `<div class="insp-head"><span class="tile" style="background:${ZONE_COLORS[z.color]}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg></span><div><h2>${esc(z.name || "โซน")}</h2><small>โซน / VLAN / พื้นที่ · มีอุปกรณ์ ${inside.length} ชิ้น</small></div></div>`;
+    h += `<div class="fields">`;
+    h += field("ชื่อโซน", "name", z.name, { full: true, ph: "DMZ · 172.16.10.0/24" });
+    h += field("สี", "color", z.color, { type: "select", full: true, options: Object.entries(ZONE_COLOR_LABELS) });
+    h += field("หมายเหตุ", "notes", z.notes, { type: "textarea", full: true });
+    h += `</div><p class="muted" style="font-size:12.5px;line-height:1.55">ลากที่กรอบเพื่อย้ายโซนพร้อมอุปกรณ์ข้างใน ลากมุมขวาล่างเพื่อปรับขนาด</p>`;
+    h += `<div class="actions"><button class="btn danger" id="delBtn">ลบโซน (อุปกรณ์ไม่ถูกลบ)</button></div>`;
+  } else {
+    const counts = {};
+    for (const n of doc.nodes) counts[n.type] = (counts[n.type] || 0) + 1;
+    h += `<div class="insp-head"><div><h2>${esc(doc.title)}</h2><small>อุปกรณ์ ${doc.nodes.length} · สาย ${doc.links.length} · โซน ${doc.zones.length}</small></div></div>`;
+    if (doc.nodes.length) {
+      h += `<div class="sec">อุปกรณ์ในผัง</div><div class="stats">`;
+      for (const [k, t] of Object.entries(TYPES)) if (counts[k]) h += `<div class="t"><span class="dot" style="background:${CATS[t.cat].color}"></span>${esc(t.label)}</div><div class="n">${counts[k]}</div>`;
+      h += `</div>`;
+    }
+    h += `<div class="sec">ชนิดสาย</div><div class="legend">`;
+    for (const [, t] of Object.entries(LINKS)) h += `<div><svg viewBox="0 0 44 10"><line x1="2" y1="5" x2="42" y2="5" stroke="${t.color || "var(--link)"}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round"/></svg>${esc(t.label)}</div>`;
+    h += `</div><div class="sec">วิธีใช้</div><ul class="help">
+      <li><b>เพิ่มอุปกรณ์</b> คลิกหรือลากจากแถบด้านซ้าย</li>
+      <li><b>ใส่รายละเอียด</b> คลิกอุปกรณ์ แล้วกรอกข้อมูลที่แผงนี้</li>
+      <li><b>เชื่อมสาย</b> กดโหมด “เชื่อมสาย” (C) แล้วลากจากอุปกรณ์หนึ่งไปอีกอุปกรณ์ หรือคลิกทีละตัว</li>
+      <li><b>โซน / VLAN</b> กด “วาดโซน” (Z) แล้วลากเป็นกรอบ</li>
+      <li><b>เลื่อนผัง</b> ลากพื้นที่ว่าง · <b>ซูม</b> ล้อเมาส์</li>
+      <li><b>ลบ</b> Delete · <b>ย้อน</b> Ctrl+Z · <b>สำเนา</b> Ctrl+D</li>
+    </ul>`;
+  }
+  inspector.innerHTML = h;
+}
+
+let editSnapshot = null;
+inspector.addEventListener("focusin", (e) => { if (e.target.matches("input,select,textarea")) editSnapshot = JSON.stringify(doc); });
+inspector.addEventListener("focusout", () => {
+  if (editSnapshot && editSnapshot !== JSON.stringify(doc)) { undoStack.push(editSnapshot); redoStack = []; updateUndoButtons(); }
+  editSnapshot = null;
+});
+inspector.addEventListener("input", (e) => {
+  const el = e.target;
+  const obj = sel && (sel.kind === "node" ? findNode(sel.id) : sel.kind === "link" ? findLink(sel.id) : findZone(sel.id));
+  if (!obj) return;
+  if (el.dataset.field) {
+    const f = el.dataset.field;
+    if (f.startsWith("extra.")) obj.extra[f.slice(6)] = el.value;
+    else obj[f] = el.value;
+    if (el.tagName === "SELECT") renderInspector();
+    else if (f === "name") { const h2 = inspector.querySelector(".insp-head h2"); if (h2) h2.textContent = el.value || "—"; }
+  } else if (el.dataset.custom != null) {
+    obj.custom[+el.dataset.custom][el.dataset.part] = el.value;
+  }
+  render(); persist();
+});
+inspector.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.id === "delBtn") return deleteSelected();
+  if (b.id === "dupBtn") return duplicate();
+  if (b.id === "addCustom") { checkpoint(); findNode(sel.id).custom.push({ k: "", v: "" }); renderInspector(); const ins = inspector.querySelectorAll("#customRows input[data-part=k]"); ins[ins.length - 1]?.focus(); persist(); return; }
+  if (b.dataset.customDel != null) { checkpoint(); findNode(sel.id).custom.splice(+b.dataset.customDel, 1); renderInspector(); persist(); return; }
+  if (b.dataset.gotoLink) { sel = { kind: "link", id: b.dataset.gotoLink }; render(); renderInspector(); return; }
+  if (b.id === "swapBtn") { checkpoint(); const l = findLink(sel.id); [l.from, l.to] = [l.to, l.from]; [l.fromPort, l.toPort] = [l.toPort, l.fromPort]; render(); renderInspector(); persist(); return; }
+  if (b.id === "connectFromBtn") { const id = sel.id; setMode("connect"); pendingFrom = id; render(); return; }
+});
+
+/* ---------- Actions ---------- */
+function deleteSelected() {
+  if (!sel) return;
+  checkpoint();
+  if (sel.kind === "node") { doc.nodes = doc.nodes.filter((n) => n.id !== sel.id); doc.links = doc.links.filter((l) => l.from !== sel.id && l.to !== sel.id); }
+  else if (sel.kind === "link") doc.links = doc.links.filter((l) => l.id !== sel.id);
+  else doc.zones = doc.zones.filter((z) => z.id !== sel.id);
+  sel = null; render(); renderInspector(); persist();
+}
+function duplicate() {
+  if (!sel || sel.kind !== "node") return;
+  checkpoint();
+  const src = findNode(sel.id);
+  const n = JSON.parse(JSON.stringify(src));
+  n.id = uid("n"); n.x += 40; n.y += 40; n.name = nextName(n.type); n.ip = ""; n.mac = ""; n.serial = "";
+  doc.nodes.push(n); sel = { kind: "node", id: n.id };
+  render(); renderInspector(); persist();
+}
+function addLink(from, to) {
+  if (from === to) return;
+  checkpoint();
+  const l = { id: uid("l"), from, to, kind: $("#linkKind").value, label: "", fromPort: "", toPort: "", notes: "" };
+  doc.links.push(l);
+  sel = { kind: "link", id: l.id };
+  render(); renderInspector(); persist();
+  toast("เชื่อมสายแล้ว ใส่พอร์ตและความเร็วได้ที่แผงด้านขวา");
+}
+const HINTS = {
+  select: "<b>เลือก/ย้าย</b> คลิกอุปกรณ์เพื่อดูรายละเอียด · ลากเพื่อย้าย · ลากพื้นที่ว่างเพื่อเลื่อนผัง",
+  connect: "<b>เชื่อมสาย</b> ลากจากอุปกรณ์ต้นทางไปปลายทาง หรือคลิกต้นทางแล้วคลิกปลายทาง · Esc เพื่อยกเลิก",
+  zone: "<b>วาดโซน</b> ลากบนพื้นที่ว่างเพื่อสร้างกรอบ DMZ, VLAN หรือห้อง/ชั้น",
+};
+function setMode(m) {
+  mode = m; pendingFrom = null;
+  for (const b of document.querySelectorAll("[data-mode]")) b.setAttribute("aria-pressed", String(b.dataset.mode === m));
+  svg.setAttribute("class", "mode-" + m);
+  $("#hint").innerHTML = HINTS[m];
+  render();
+}
+
+/* ---------- Pointer interaction ---------- */
+svg.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 && e.pointerType === "mouse") return;
+  const p = toWorld(e);
+  const t = e.target.closest("[data-kind]");
+  const kind = t?.dataset.kind, id = t?.dataset.id;
+  if (mode === "connect" && kind === "node") {
+    if (pendingFrom && pendingFrom !== id) { const f = pendingFrom; pendingFrom = null; addLink(f, id); return; }
+    drag = { type: "link", from: id, cx: p.x, cy: p.y, sx: e.clientX, sy: e.clientY };
+  } else if (mode === "zone" && kind !== "zone-resize") {
+    drag = { type: "newzone", x0: snap(p.x), y0: snap(p.y), x1: snap(p.x), y1: snap(p.y) };
+  } else if (kind === "node") {
+    const n = findNode(id);
+    sel = { kind: "node", id }; renderInspector();
+    drag = { type: "node", id, ox: p.x - n.x, oy: p.y - n.y, before: JSON.stringify(doc), moved: false };
+  } else if (kind === "zone-resize") {
+    drag = { type: "resize", id, before: JSON.stringify(doc), moved: false };
+  } else if (kind === "zone") {
+    const z = findZone(id);
+    sel = { kind: "zone", id }; renderInspector();
+    const inside = doc.nodes.filter((n) => n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h).map((n) => n.id);
+    drag = { type: "zone", id, lx: p.x, ly: p.y, sx: z.x, sy: z.y, inside, start: inside.map((nid) => { const n = findNode(nid); return [n.x, n.y]; }), px: p.x, py: p.y, before: JSON.stringify(doc), moved: false };
+  } else if (kind === "link" && mode === "select") {
+    sel = { kind: "link", id }; renderInspector();
+  } else {
+    if (mode === "select" && sel) { sel = null; renderInspector(); }
+    if (mode === "connect") pendingFrom = null;
+    drag = { type: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+  }
+  svg.setPointerCapture(e.pointerId);
+  render();
+});
+svg.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const p = toWorld(e);
+  if (drag.type === "pan") { view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; applyView(); return; }
+  if (drag.type === "node") { const n = findNode(drag.id); n.x = snap(p.x - drag.ox); n.y = snap(p.y - drag.oy); drag.moved = true; }
+  else if (drag.type === "zone") {
+    const z = findZone(drag.id), dx = snap(p.x - drag.px), dy = snap(p.y - drag.py);
+    z.x = drag.sx + dx; z.y = drag.sy + dy;
+    drag.inside.forEach((nid, i) => { const n = findNode(nid); n.x = drag.start[i][0] + dx; n.y = drag.start[i][1] + dy; });
+    drag.moved = true;
+  } else if (drag.type === "resize") {
+    const z = findZone(drag.id); z.w = Math.max(80, snap(p.x - z.x)); z.h = Math.max(50, snap(p.y - z.y)); drag.moved = true;
+  } else if (drag.type === "link") { drag.cx = p.x; drag.cy = p.y; }
+  else if (drag.type === "newzone") { drag.x1 = snap(p.x); drag.y1 = snap(p.y); }
+  render();
+});
+function endDrag(e) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if ((d.type === "node" || d.type === "zone" || d.type === "resize") && d.moved) {
+    undoStack.push(d.before); redoStack = []; updateUndoButtons(); persist();
+  } else if (d.type === "link") {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const t = el && el.closest && el.closest('[data-kind="node"]');
+    const moved = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 6;
+    if (t && t.dataset.id !== d.from) addLink(d.from, t.dataset.id);
+    else if (!moved) pendingFrom = d.from;
+    else pendingFrom = null;
+  } else if (d.type === "newzone") {
+    const r = normRect(d);
+    if (r.w >= 60 && r.h >= 40) {
+      checkpoint();
+      const z = { id: uid("z"), ...r, name: "โซนใหม่", color: "blue", notes: "" };
+      doc.zones.push(z); sel = { kind: "zone", id: z.id };
+      setMode("select"); renderInspector(); persist();
+      setTimeout(() => { const i = $("#f_name"); i && (i.focus(), i.select()); }, 0);
+    }
+  }
+  if (d.type === "node" || d.type === "zone") renderInspector();
+  render();
+}
+svg.addEventListener("pointerup", endDrag);
+svg.addEventListener("pointercancel", () => { drag = null; render(); });
+svg.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const r = svg.getBoundingClientRect();
+  zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+svg.addEventListener("dblclick", (e) => {
+  const t = e.target.closest('[data-kind="node"],[data-kind="zone"]');
+  if (t) setTimeout(() => { const i = $("#f_name"); i && (i.focus(), i.select()); }, 0);
+});
+
+/* ---------- Keyboard ---------- */
+document.addEventListener("keydown", (e) => {
+  const typing = e.target.matches("input,textarea,select");
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.key.toLowerCase() === "y" && !typing) { e.preventDefault(); redo(); return; }
+  if (mod && e.key.toLowerCase() === "d" && !typing) { e.preventDefault(); duplicate(); return; }
+  if (typing) { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); }
+  else if (e.key === "Escape") { if (pendingFrom || mode !== "select") setMode("select"); else { sel = null; render(); renderInspector(); } closeModals(); }
+  else if (e.key === "v" || e.key === "V") setMode("select");
+  else if (e.key === "c" || e.key === "C") setMode("connect");
+  else if (e.key === "z" || e.key === "Z") setMode("zone");
+  else if (e.key === "+" || e.key === "=") { const r = svg.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); }
+  else if (e.key === "-") { const r = svg.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); }
+  else if (sel && sel.kind === "node" && e.key.startsWith("Arrow")) {
+    e.preventDefault(); checkpoint();
+    const n = findNode(sel.id), s = e.shiftKey ? 50 : 10;
+    if (e.key === "ArrowLeft") n.x -= s; if (e.key === "ArrowRight") n.x += s; if (e.key === "ArrowUp") n.y -= s; if (e.key === "ArrowDown") n.y += s;
+    render(); persist();
+  }
+});
+
+/* ---------- Toolbar ---------- */
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 2600);
+}
+for (const b of document.querySelectorAll("[data-mode]")) b.addEventListener("click", () => setMode(b.dataset.mode));
+$("#linkKind").innerHTML = Object.entries(LINKS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
+$("#undoBtn").onclick = undo; $("#redoBtn").onclick = redo;
+$("#zoomIn").onclick = () => { const r = svg.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); };
+$("#zoomOut").onclick = () => { const r = svg.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); };
+$("#zoomFit").onclick = fit;
+$("#docTitle").addEventListener("focus", () => (editSnapshot = JSON.stringify(doc)));
+$("#docTitle").addEventListener("input", (e) => { doc.title = e.target.value; persist(); if (!sel) renderInspector(); });
+$("#docTitle").addEventListener("blur", () => { if (editSnapshot && editSnapshot !== JSON.stringify(doc)) { undoStack.push(editSnapshot); redoStack = []; updateUndoButtons(); } editSnapshot = null; });
+
+const newBtn = $("#newBtn");
+newBtn.addEventListener("click", async () => {
+  if (!newBtn.classList.contains("armed")) {
+    newBtn.classList.add("armed"); newBtn.textContent = "กดอีกครั้งเพื่อล้างผัง";
+    clearTimeout(newBtn._t); newBtn._t = setTimeout(() => { newBtn.classList.remove("armed"); newBtn.textContent = "ผังใหม่"; }, 3500);
+    return;
+  }
+  clearTimeout(newBtn._t); newBtn.classList.remove("armed"); newBtn.textContent = "ผังใหม่";
+  await newDiagram();
+});
+async function newDiagram() {
+  if (server) { await createOnServer({ version: 1, title: "ผังเครือข่ายใหม่", nodes: [], links: [], zones: [] }); return; }
+  checkpoint();
+  doc = { version: 1, title: "ผังเครือข่ายใหม่", nodes: [], links: [], zones: [] };
+  sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView();
+  toast("เริ่มผังใหม่แล้ว กด ย้อน ถ้าต้องการผังเดิมคืน");
+}
+
+/* ---------- Files: downloads ---------- */
+const dlPromise = (window.claude && typeof window.claude.use === "function") ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+function safeName(ext) { return (doc.title || "network-diagram").replace(/[\\/:*?"<>|]+/g, "-").trim().slice(0, 80) + "." + ext; }
+async function saveFile(filename, data, mime) {
+  const dl = await dlPromise;
+  if (dl) {
+    try { await dl.save({ filename, data }); toast("บันทึกไฟล์ " + filename + " แล้ว"); }
+    catch (err) { if (err && err.code !== "declined") toast("บันทึกไฟล์ไม่สำเร็จ: " + (err.message || err.code)); }
+    return;
+  }
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const EXPORT_CSS = `.nlabel{font:600 12.5px 'IBM Plex Sans Thai','Noto Sans Thai',Tahoma,sans-serif;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.nip{font:500 11px 'IBM Plex Mono',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.llabel{font:500 11px 'IBM Plex Mono',Consolas,monospace;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.lport{font:500 10px 'IBM Plex Mono',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
+.zlabel{font:700 13px 'IBM Plex Sans Thai','Noto Sans Thai',Tahoma,sans-serif}.statdot{stroke:#fff;stroke-width:2}
+.ttl{font:700 18px 'IBM Plex Sans Thai','Noto Sans Thai',Tahoma,sans-serif;fill:#18212d}.sub{font:400 12px 'IBM Plex Sans Thai',Tahoma,sans-serif;fill:#5d6a7a}`;
+function exportSVG() {
+  const b = bbox(), pad = 40, head = 56;
+  const w = Math.ceil(b.w + pad * 2), h = Math.ceil(b.h + pad * 2 + head);
+  const date = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><style>${EXPORT_CSS}</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text class="ttl" x="${pad}" y="34">${esc(doc.title)}</text><text class="sub" x="${pad}" y="54">อุปกรณ์ ${doc.nodes.length} · สาย ${doc.links.length} · ${esc(date)}</text>
+<g transform="translate(${pad - b.x} ${pad + head - b.y})">${diagramMarkup({ export: true })}</g></svg>`;
+}
+function exportPNG() {
+  return new Promise((resolve, reject) => {
+    const s = exportSVG();
+    const m = s.match(/width="(\d+)" height="(\d+)"/);
+    const w = +m[1], h = +m[2], scale = Math.min(2, 8000 / Math.max(w, h));
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([s], { type: "image/svg+xml" }));
+    img.onload = () => {
+      const c = document.createElement("canvas"); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+      const ctx = c.getContext("2d"); ctx.scale(scale, scale); ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      c.toBlob((bl) => (bl ? resolve(bl) : reject(new Error("png"))), "image/png");
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("svg")); };
+    img.src = url;
+  });
+}
+function exportCSV() {
+  const cols = [["name", "ชื่อ"], ["type", "ชนิด"], ["status", "สถานะ"], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["vendor", "ยี่ห้อ"], ["model", "รุ่น"], ["serial", "Serial"], ["os", "OS/Firmware"], ["location", "ตำแหน่ง"], ["extra", "ข้อมูลเฉพาะ"], ["custom", "ฟิลด์เพิ่มเติม"], ["links", "เชื่อมต่อกับ"], ["notes", "หมายเหตุ"]];
+  const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const rows = [cols.map((c) => q(c[1])).join(",")];
+  for (const n of doc.nodes) {
+    const t = TYPES[n.type];
+    const vals = cols.map(([k]) => {
+      if (k === "type") return t.label;
+      if (k === "status") return STATUS[n.status]?.label || n.status;
+      if (k === "extra") return t.extra.filter((x) => n.extra[x]).map((x) => `${EXTRA_LABELS[x]}: ${n.extra[x]}`).join("; ");
+      if (k === "custom") return n.custom.filter((c) => c.k || c.v).map((c) => `${c.k}: ${c.v}`).join("; ");
+      if (k === "links") return doc.links.filter((l) => l.from === n.id || l.to === n.id).map((l) => findNode(l.from === n.id ? l.to : l.from)?.name).join("; ");
+      return n[k];
+    });
+    rows.push(vals.map(q).join(","));
+  }
+  return "﻿" + rows.join("\r\n");
+}
+$("#exportSel").addEventListener("change", async (e) => {
+  const v = e.target.value; e.target.value = "";
+  try {
+    if (v === "svg") await saveFile(safeName("svg"), exportSVG(), "image/svg+xml");
+    else if (v === "png") await saveFile(safeName("png"), await exportPNG(), "image/png");
+    else if (v === "csv") await saveFile(safeName("csv"), exportCSV(), "text/csv");
+    else if (v === "json") await saveFile(safeName("json"), JSON.stringify(doc, null, 2), "application/json");
+  } catch (err) { toast("ส่งออกไม่สำเร็จ ลองอีกครั้ง"); }
+});
+
+/* ---------- JSON modal ---------- */
+function openModal(id) { $(id).hidden = false; }
+function closeModals() { for (const m of document.querySelectorAll(".overlay")) m.hidden = true; }
+for (const m of document.querySelectorAll(".overlay")) {
+  m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-close]")) m.hidden = true; });
+}
+$("#jsonBtn").onclick = () => { $("#jsonText").value = JSON.stringify(doc, null, 2); openModal("#jsonModal"); };
+$("#jsonCopy").onclick = async () => {
+  const ta = $("#jsonText");
+  try { await navigator.clipboard.writeText(ta.value); toast("คัดลอกแล้ว"); }
+  catch (e) { ta.focus(); ta.select(); toast("เลือกข้อความแล้ว กด Ctrl+C เพื่อคัดลอก"); }
+};
+$("#jsonSave").onclick = () => saveFile(safeName("json"), JSON.stringify(doc, null, 2), "application/json");
+function loadDoc(d) {
+  const nd = normalize(d);
+  checkpoint(); doc = nd; sel = null; afterDocSwap(); fit();
+}
+$("#jsonLoad").onclick = () => {
+  try { loadDoc(JSON.parse($("#jsonText").value)); closeModals(); persistNewOrCurrent(); toast("โหลดผังแล้ว"); }
+  catch (e) { toast("อ่าน JSON ไม่ได้: " + e.message); }
+};
+$("#jsonFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  try { loadDoc(JSON.parse(await f.text())); closeModals(); persistNewOrCurrent(); toast("เปิดไฟล์ " + f.name + " แล้ว"); }
+  catch (err) { toast("เปิดไฟล์ไม่ได้: " + err.message); }
+});
+async function persistNewOrCurrent() {
+  if (server) await createOnServer(doc, true); else persist();
+}
+
+/* ---------- Server diagrams ---------- */
+async function createOnServer(d, keepDoc) {
+  try {
+    const r = await fetch("api/diagrams", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    if (!keepDoc) { checkpoint(); doc = normalize(d); sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView(); }
+    docId = j.id; persist(); closeModals();
+    toast("สร้างผังบนเซิร์ฟเวอร์แล้ว");
+  } catch (e) { toast("สร้างผังบนเซิร์ฟเวอร์ไม่สำเร็จ"); }
+}
+async function openFiles() {
+  const box = $("#filesList");
+  box.innerHTML = `<p class="muted">กำลังโหลด…</p>`;
+  openModal("#filesModal");
+  try {
+    const list = await (await fetch("api/diagrams", { cache: "no-store" })).json();
+    if (!list.length) { box.innerHTML = `<p class="muted">ยังไม่มีผังบนเซิร์ฟเวอร์</p>`; return; }
+    box.innerHTML = list.map((x) => `<div class="list-row${x.id === docId ? " current" : ""}"><div><b>${esc(x.title)}</b><small>อุปกรณ์ ${x.nodes} · แก้ไขล่าสุด ${esc(new Date(x.updatedAt).toLocaleString("th-TH"))}${x.id === docId ? " · กำลังเปิดอยู่" : ""}</small></div><button class="btn" data-open="${esc(x.id)}">เปิด</button><button class="btn danger" data-del="${esc(x.id)}">ลบ</button></div>`).join("");
+  } catch (e) { box.innerHTML = `<p class="muted">โหลดรายการไม่ได้ ตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่</p>`; }
+}
+$("#filesBtn").onclick = openFiles;
+$("#filesNew").onclick = () => createOnServer({ version: 1, title: "ผังเครือข่ายใหม่", nodes: [], links: [], zones: [] });
+$("#filesList").addEventListener("click", async (e) => {
+  const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
+  if (o) {
+    try {
+      const r = await fetch("api/diagrams/" + encodeURIComponent(o.dataset.open), { cache: "no-store" });
+      const j = normalize(await r.json());
+      doc = j; docId = o.dataset.open; undoStack = []; redoStack = []; sel = null; afterDocSwap(); fit(); closeModals();
+    } catch (err) { toast("เปิดผังไม่ได้"); }
+  }
+  if (d) {
+    if (!d.classList.contains("armed")) { d.classList.add("armed"); d.textContent = "ยืนยันลบ"; return; }
+    await fetch("api/diagrams/" + encodeURIComponent(d.dataset.del), { method: "DELETE" });
+    if (d.dataset.del === docId) docId = null;
+    openFiles();
+  }
+});
+
+/* ---------- Boot ---------- */
+function boot() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) {}
+  try { doc = saved && saved.doc ? normalize(saved.doc) : sample(); docId = saved?.docId || null; } catch (e) { doc = sample(); }
+  $("#docTitle").value = doc.title;
+  buildPalette(); setMode("select"); renderInspector(); updateUndoButtons();
+  requestAnimationFrame(fit);
+  window.addEventListener("resize", () => { if (!doc.nodes.length) return; });
+  detectServer().then(async (ok) => {
+    server = ok;
+    if (!ok) { setPill("บันทึกอัตโนมัติในเบราว์เซอร์นี้", false); return; }
+    $("#filesBtn").hidden = false;
+    setPill("เชื่อมต่อเซิร์ฟเวอร์แล้ว", true);
+    try {
+      if (docId) {
+        const r = await fetch("api/diagrams/" + encodeURIComponent(docId), { cache: "no-store" });
+        if (r.ok) { doc = normalize(await r.json()); afterDocSwap(); fit(); return; }
+      }
+      const list = await (await fetch("api/diagrams", { cache: "no-store" })).json();
+      if (list.length) {
+        const r = await fetch("api/diagrams/" + encodeURIComponent(list[0].id), { cache: "no-store" });
+        doc = normalize(await r.json()); docId = list[0].id; afterDocSwap(); fit();
+      } else {
+        await createOnServer(doc, true);
+      }
+    } catch (e) { setPill("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", false); }
+  });
+}
+boot();
+})();
+</script>

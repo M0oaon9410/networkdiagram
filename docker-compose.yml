@@ -1,0 +1,13 @@
+services:
+  netplan:
+    build: .
+    image: netplan:latest
+    container_name: netplan
+    ports:
+      - "8080:8080"
+    volumes:
+      - netplan-data:/data
+    restart: unless-stopped
+
+volumes:
+  netplan-data:

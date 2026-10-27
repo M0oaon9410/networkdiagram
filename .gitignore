@@ -1,0 +1,21 @@
+# Diagram data saved by the server (local runs)
+data/
+*.tmp
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment / secrets
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Archives and backups
+*.zip
+*.tgz

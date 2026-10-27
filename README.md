@@ -1,0 +1,72 @@
+# NetPlan · โปรแกรมวาดผังเครือข่าย (Network Diagram)
+
+โปรแกรมบนเว็บสำหรับวาด network diagram มีอุปกรณ์ให้เลือก 16 ชนิด เช่น Router, Firewall, Core Switch, Switch, Access Point, Server, Database, NAS, PC, Laptop, Printer, IP Phone, กล้อง CCTV, UPS และใส่รายละเอียดของแต่ละอุปกรณ์ได้ (IP, Subnet, Gateway, VLAN, MAC, ยี่ห้อ, รุ่น, Serial, OS, ตำแหน่ง Rack, สถานะ, หมายเหตุ และฟิลด์ที่เพิ่มเองได้) ผังจะถูกบันทึกเป็นไฟล์ JSON บนเซิร์ฟเวอร์โดยอัตโนมัติ
+
+## วิธีติดตั้งด้วย Docker
+
+ต้องมี Docker และ Docker Compose (Docker Desktop มีให้ครบแล้ว)
+
+```bash
+cd netplan
+docker compose up -d --build
+```
+
+จากนั้นเปิดเบราว์เซอร์ไปที่ **http://localhost:8080** (หรือ `http://<IP ของเครื่อง>:8080` จากเครื่องอื่นในวง LAN)
+
+คำสั่งที่ใช้บ่อย
+
+| ต้องการ | คำสั่ง |
+|---|---|
+| ดู log | `docker compose logs -f` |
+| หยุดโปรแกรม | `docker compose down` |
+| อัปเดตหลังแก้ไฟล์ | `docker compose up -d --build` |
+| เปลี่ยนพอร์ต | แก้ `"8080:8080"` ใน `docker-compose.yml` เป็น เช่น `"9000:8080"` |
+
+ข้อมูลผังเก็บอยู่ใน Docker volume ชื่อ `netplan-data` (ไฟล์ละผังที่ `/data/<id>.json` ในคอนเทนเนอร์) จึงไม่หายเมื่อสั่ง `down` หรือ build ใหม่ ถ้าใช้ `docker compose down -v` ข้อมูลจะถูกลบทั้งหมด
+
+สำรองข้อมูล:
+
+```bash
+docker run --rm -v netplan_netplan-data:/data -v "$PWD":/backup alpine tar czf /backup/netplan-backup.tgz -C /data .
+```
+
+## รันโดยไม่ใช้ Docker
+
+ต้องมี Node.js 18 ขึ้นไป ไม่ต้องติดตั้งแพ็กเกจเพิ่ม
+
+```bash
+node server.js        # ข้อมูลเก็บที่โฟลเดอร์ ./data
+```
+
+## วิธีใช้งาน
+
+- **เพิ่มอุปกรณ์** คลิกหรือลากจากแถบด้านซ้าย
+- **ใส่รายละเอียด** คลิกอุปกรณ์แล้วกรอกที่แผงด้านขวา แต่ละชนิดมีช่องเฉพาะ เช่น AP มี SSID/Channel, Firewall มี HA/Security zones และกด “+ เพิ่มฟิลด์” เพื่อเพิ่มช่องเองได้
+- **เชื่อมสาย** กดปุ่ม “เชื่อมสาย” (คีย์ลัด C) เลือกชนิดสาย (UTP, Fiber, WAN, VPN, Wireless, Stack/HA) แล้วลากจากอุปกรณ์หนึ่งไปอีกอุปกรณ์ คลิกที่สายเพื่อใส่พอร์ตทั้งสองฝั่งและความเร็ว
+- **โซน / VLAN** กด “วาดโซน” (Z) แล้วลากเป็นกรอบ ลากกรอบเพื่อย้ายทั้งโซนพร้อมอุปกรณ์ข้างใน
+- **ส่งออก** เป็นรูป PNG / SVG, รายการอุปกรณ์ CSV (เปิดใน Excel ได้ภาษาไทย) หรือไฟล์ผัง JSON
+- **ผังทั้งหมด** ดู เปิด สร้าง หรือลบผังที่เก็บบนเซิร์ฟเวอร์
+- คีย์ลัด: Delete ลบ · Ctrl+Z ย้อน · Ctrl+Y ทำซ้ำ · Ctrl+D ทำสำเนา · ลูกศรเลื่อนอุปกรณ์ · ล้อเมาส์ซูม
+
+## API (สำหรับเชื่อมกับระบบอื่น)
+
+| Method | Path | ใช้ทำอะไร |
+|---|---|---|
+| GET | `/api/diagrams` | รายการผังทั้งหมด |
+| POST | `/api/diagrams` | สร้างผังใหม่ คืนค่า `{ id }` |
+| GET | `/api/diagrams/:id` | อ่านผัง |
+| PUT | `/api/diagrams/:id` | บันทึกผัง |
+| DELETE | `/api/diagrams/:id` | ลบผัง |
+
+> หมายเหตุ: โปรแกรมไม่มีระบบล็อกอิน ทุกคนที่เข้าถึงพอร์ตได้จะแก้ไขผังได้ ควรเปิดใช้ในวง LAN ภายใน หรือวางไว้หลัง reverse proxy ที่มีการยืนยันตัวตน
+
+## โครงสร้างไฟล์
+
+```
+netplan/
+├── Dockerfile
+├── docker-compose.yml
+├── server.js          เว็บเซิร์ฟเวอร์ + API (Node.js ไม่มี dependency)
+├── package.json
+└── public/app.html    หน้าโปรแกรมทั้งหมด (HTML/CSS/JS ไฟล์เดียว)
+```
