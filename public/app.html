@@ -372,6 +372,7 @@ function sample() {
       l("sw2", "ap2", "eth", { fromPort: "1/1/1" }),
       l("sw2", "prn1", "eth", { fromPort: "1/1/12" }),
       l("sw2", "cam1", "eth", { fromPort: "1/1/20" }),
+      l("z_lan", "z_dmz", "vpn", { label: "Policy LAN → DMZ" }),
     ],
     zones: [
       { id: "z_dmz", x: 650, y: 270, w: 180, h: 160, name: "DMZ · 172.16.10.0/24", color: "red", notes: "" },
@@ -401,6 +402,19 @@ const snap = (v) => Math.round(v / 10) * 10;
 const findNode = (id) => doc.nodes.find((n) => n.id === id);
 const findLink = (id) => doc.links.find((l) => l.id === id);
 const findZone = (id) => doc.zones.find((z) => z.id === id);
+// A link end is either a device or a zone.
+const endName = (id) => { const n = findNode(id); if (n) return n.name || TYPES[n.type].label; const z = findZone(id); return z ? z.name || "โซน" : "?"; };
+const endCenter = (id) => { const n = findNode(id); if (n) return { x: n.x, y: n.y }; const z = findZone(id); return z ? { x: z.x + z.w / 2, y: z.y + z.h / 2 } : null; };
+// Where a line toward `toward` meets the end: a device's center, or the zone's border.
+function endAnchor(id, toward) {
+  const n = findNode(id); if (n) return { x: n.x, y: n.y, zone: false };
+  const z = findZone(id); if (!z) return null;
+  const cx = z.x + z.w / 2, cy = z.y + z.h / 2;
+  let dx = toward.x - cx, dy = toward.y - cy;
+  if (!dx && !dy) dy = 1;
+  const t = Math.min(dx ? z.w / 2 / Math.abs(dx) : Infinity, dy ? z.h / 2 / Math.abs(dy) : Infinity);
+  return { x: cx + dx * t, y: cy + dy * t, zone: true };
+}
 
 function normalize(d) {
   if (!d || typeof d !== "object" || !Array.isArray(d.nodes)) throw new Error("ไม่พบรายการอุปกรณ์ (nodes) ในไฟล์");
@@ -410,14 +424,14 @@ function normalize(d) {
     out.nodes.push({ name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", os: "", location: "", status: "active", notes: "",
       ...n, type: TYPES[n.type] ? n.type : "server", x: +n.x || 0, y: +n.y || 0, extra: { ...(n.extra || {}) }, custom: Array.isArray(n.custom) ? n.custom.map((c) => ({ k: String(c.k ?? ""), v: String(c.v ?? "") })) : [] });
   }
-  const ids = new Set(out.nodes.map((n) => n.id));
-  for (const l of d.links || []) {
-    if (!l || !ids.has(l.from) || !ids.has(l.to)) continue;
-    out.links.push({ label: "", fromPort: "", toPort: "", notes: "", ...l, id: l.id || uid("l"), kind: LINKS[l.kind] ? l.kind : "eth" });
-  }
   for (const z of d.zones || []) {
     if (!z) continue;
     out.zones.push({ name: "", notes: "", ...z, id: z.id || uid("z"), x: +z.x || 0, y: +z.y || 0, w: Math.max(60, +z.w || 200), h: Math.max(40, +z.h || 120), color: ZONE_COLORS[z.color] ? z.color : "blue" });
+  }
+  const ids = new Set([...out.nodes.map((n) => n.id), ...out.zones.map((z) => z.id)]);
+  for (const l of d.links || []) {
+    if (!l || !ids.has(l.from) || !ids.has(l.to) || l.from === l.to) continue;
+    out.links.push({ label: "", fromPort: "", toPort: "", notes: "", ...l, id: l.id || uid("l"), kind: LINKS[l.kind] ? l.kind : "eth" });
   }
   return out;
 }
@@ -529,8 +543,9 @@ function diagramMarkup(opts = {}) {
   for (const z of doc.zones) {
     const c = ZONE_COLORS[z.color];
     const isSel = !exp && sel && sel.kind === "zone" && sel.id === z.id;
+    const isPend = !exp && pendingFrom === z.id;
     out += `<g data-kind="zone" data-id="${z.id}">`;
-    out += `<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="12" fill="${c}" fill-opacity=".07" stroke="${c}" stroke-opacity=".75" stroke-width="${isSel ? 2.5 : 1.5}" stroke-dasharray="7 5" style="cursor:move"/>`;
+    out += `<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="12" fill="${c}" fill-opacity="${isPend ? ".16" : ".07"}" stroke="${isPend ? "var(--sel)" : c}" stroke-opacity=".75" stroke-width="${isSel || isPend ? 2.5 : 1.5}" stroke-dasharray="7 5" style="cursor:${mode === "connect" ? "crosshair" : "move"}"/>`;
     out += `<text class="zlabel" x="${z.x + 12}" y="${z.y + 22}" fill="${c}" style="cursor:move">${esc(z.name || "โซน")}</text>`;
     out += `</g>`;
     if (isSel) out += `<rect data-kind="zone-resize" data-id="${z.id}" x="${z.x + z.w - 9}" y="${z.y + z.h - 9}" width="16" height="16" rx="3" fill="var(--panel)" stroke="${c}" stroke-width="2" style="cursor:nwse-resize"/>`;
@@ -539,8 +554,9 @@ function diagramMarkup(opts = {}) {
   const pairs = {};
   for (const l of doc.links) { const k = [l.from, l.to].sort().join("|"); (pairs[k] ||= []).push(l.id); }
   for (const l of doc.links) {
-    const a = findNode(l.from), b = findNode(l.to);
-    if (!a || !b) continue;
+    const ca = endCenter(l.from), cb = endCenter(l.to);
+    if (!ca || !cb) continue;
+    const a = endAnchor(l.from, cb), b = endAnchor(l.to, ca);
     const k = [l.from, l.to].sort().join("|"), grp = pairs[k], idx = grp.indexOf(l.id);
     const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
     const ux = dx / len, uy = dy / len, px = -uy, py = ux;
@@ -554,9 +570,11 @@ function diagramMarkup(opts = {}) {
     if (isSel) out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--sel)" stroke-opacity=".45" stroke-width="${t.width + 7}" stroke-linecap="round"/>`;
     out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round"/>`;
     if (!exp) out += `<line class="hit" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
-    // keep text clear of the tile and of the name/IP printed below each node
-    const clear = (dirY) => 40 + (dirY > 0 ? 34 * dirY : 0);
-    const d1 = Math.min(len * 0.4, clear(uy)), d2 = Math.min(len * 0.4, clear(-uy));
+    if (a.zone) out += `<circle cx="${x1}" cy="${y1}" r="4.5" fill="${col}"/>`;
+    if (b.zone) out += `<circle cx="${x2}" cy="${y2}" r="4.5" fill="${col}"/>`;
+    // keep text clear of the tile and of the name/IP printed below each node; a zone end only needs a small gap
+    const clear = (dirY, zone) => zone ? 24 : 40 + (dirY > 0 ? 34 * dirY : 0);
+    const d1 = Math.min(len * 0.4, clear(uy, a.zone)), d2 = Math.min(len * 0.4, clear(-uy, b.zone));
     const mx = (x1 + ux * d1 + x2 - ux * d2) / 2, my = (y1 + uy * d1 + y2 - uy * d2) / 2;
     if (l.label) out += `<text class="llabel" x="${mx}" y="${my + 4}" text-anchor="middle">${esc(l.label)}</text>`;
     if (len > 150) {
@@ -590,7 +608,7 @@ function render() {
   raf = requestAnimationFrame(() => {
     let temp = "";
     if (drag && drag.type === "link") {
-      const a = findNode(drag.from);
+      const a = endCenter(drag.from);
       temp = `<line x1="${a.x}" y1="${a.y}" x2="${drag.cx}" y2="${drag.cy}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>`;
     }
     if (drag && drag.type === "newzone") {
@@ -665,6 +683,11 @@ function field(label, key, val, o = {}) {
 }
 const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
+function linkRow(l, selfId) {
+  const mine = l.from === selfId;
+  const myPort = mine ? l.fromPort : l.toPort, otherPort = mine ? l.toPort : l.fromPort;
+  return `<button class="btn" data-goto-link="${l.id}" style="justify-content:space-between;width:100%"><span>${esc(myPort || "—")} → ${esc(endName(mine ? l.to : l.from))}${otherPort ? " (" + esc(otherPort) + ")" : ""}</span><span class="muted">${esc(LINKS[l.kind].label)}</span></button>`;
+}
 function renderInspector() {
   let h = "";
   if (sel && sel.kind === "node") {
@@ -698,16 +721,15 @@ function renderInspector() {
     if (linked.length) {
       h += `<div class="sec">การเชื่อมต่อ (${linked.length})</div><div class="list">`;
       for (const l of linked) {
-        const other = findNode(l.from === n.id ? l.to : l.from);
-        const myPort = l.from === n.id ? l.fromPort : l.toPort, otherPort = l.from === n.id ? l.toPort : l.fromPort;
-        h += `<button class="btn" data-goto-link="${l.id}" style="justify-content:space-between;width:100%"><span>${esc(myPort || "—")} → ${esc(other.name)}${otherPort ? " (" + esc(otherPort) + ")" : ""}</span><span class="muted">${esc(LINKS[l.kind].label)}</span></button>`;
+        h += linkRow(l, n.id);
       }
       h += `</div>`;
     }
     h += `<div class="actions"><button class="btn" id="dupBtn">ทำสำเนา <span class="kbd">Ctrl+D</span></button><button class="btn" id="connectFromBtn">เชื่อมสายจากอุปกรณ์นี้</button><button class="btn danger" id="delBtn">ลบอุปกรณ์ <span class="kbd">Del</span></button></div>`;
   } else if (sel && sel.kind === "link") {
-    const l = findLink(sel.id), a = findNode(l.from), b = findNode(l.to);
-    h += `<div class="insp-head"><span class="tile" style="background:var(--panel-2);border:1px solid var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg></span><div><h2>${esc(a.name)} ↔ ${esc(b.name)}</h2><small>สายเชื่อมต่อ</small></div></div>`;
+    const l = findLink(sel.id), a = { name: endName(l.from) }, b = { name: endName(l.to) };
+    const zoneEnds = (findZone(l.from) ? 1 : 0) + (findZone(l.to) ? 1 : 0);
+    h += `<div class="insp-head"><span class="tile" style="background:var(--panel-2);border:1px solid var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg></span><div><h2>${esc(a.name)} ↔ ${esc(b.name)}</h2><small>${zoneEnds === 2 ? "สายเชื่อมระหว่างโซน" : zoneEnds ? "สายเชื่อมอุปกรณ์กับโซน" : "สายเชื่อมต่อ"}</small></div></div>`;
     h += `<div class="fields">`;
     h += field("ชนิดสาย", "kind", l.kind, { type: "select", full: true, options: Object.entries(LINKS).map(([k, v]) => [k, v.label]) });
     h += field("ป้ายบนสาย (ความเร็ว, VLAN)", "label", l.label, { full: true, ph: "1G, Trunk VLAN 10–40" });
@@ -724,7 +746,13 @@ function renderInspector() {
     h += field("สี", "color", z.color, { type: "select", full: true, options: Object.entries(ZONE_COLOR_LABELS) });
     h += field("หมายเหตุ", "notes", z.notes, { type: "textarea", full: true });
     h += `</div><p class="muted" style="font-size:12.5px;line-height:1.55">ลากที่กรอบเพื่อย้ายโซนพร้อมอุปกรณ์ข้างใน ลากมุมขวาล่างเพื่อปรับขนาด</p>`;
-    h += `<div class="actions"><button class="btn danger" id="delBtn">ลบโซน (อุปกรณ์ไม่ถูกลบ)</button></div>`;
+    const zl = doc.links.filter((l) => l.from === z.id || l.to === z.id);
+    if (zl.length) {
+      h += `<div class="sec">การเชื่อมต่อ (${zl.length})</div><div class="list">`;
+      for (const l of zl) h += linkRow(l, z.id);
+      h += `</div>`;
+    }
+    h += `<div class="actions"><button class="btn" id="connectFromBtn">เชื่อมสายจากโซนนี้</button><button class="btn danger" id="delBtn">ลบโซน (อุปกรณ์ไม่ถูกลบ)</button></div>`;
   } else {
     const counts = {};
     for (const n of doc.nodes) counts[n.type] = (counts[n.type] || 0) + 1;
@@ -739,7 +767,7 @@ function renderInspector() {
     h += `</div><div class="sec">วิธีใช้</div><ul class="help">
       <li><b>เพิ่มอุปกรณ์</b> คลิกหรือลากจากแถบด้านซ้าย</li>
       <li><b>ใส่รายละเอียด</b> คลิกอุปกรณ์ แล้วกรอกข้อมูลที่แผงนี้</li>
-      <li><b>เชื่อมสาย</b> กดโหมด “เชื่อมสาย” (C) แล้วลากจากอุปกรณ์หนึ่งไปอีกอุปกรณ์ หรือคลิกทีละตัว</li>
+      <li><b>เชื่อมสาย</b> กดโหมด “เชื่อมสาย” (C) แล้วลากจากอุปกรณ์หรือโซนหนึ่งไปอีกอันหนึ่ง หรือคลิกทีละตัว</li>
       <li><b>โซน / VLAN</b> กด “วาดโซน” (Z) แล้วลากเป็นกรอบ</li>
       <li><b>เลื่อนผัง</b> ลากพื้นที่ว่าง · <b>ซูม</b> ล้อเมาส์</li>
       <li><b>ลบ</b> Delete · <b>ย้อน</b> Ctrl+Z · <b>สำเนา</b> Ctrl+D</li>
@@ -786,7 +814,7 @@ function deleteSelected() {
   checkpoint();
   if (sel.kind === "node") { doc.nodes = doc.nodes.filter((n) => n.id !== sel.id); doc.links = doc.links.filter((l) => l.from !== sel.id && l.to !== sel.id); }
   else if (sel.kind === "link") doc.links = doc.links.filter((l) => l.id !== sel.id);
-  else doc.zones = doc.zones.filter((z) => z.id !== sel.id);
+  else { doc.zones = doc.zones.filter((z) => z.id !== sel.id); doc.links = doc.links.filter((l) => l.from !== sel.id && l.to !== sel.id); }
   sel = null; render(); renderInspector(); persist();
 }
 function duplicate() {
@@ -809,7 +837,7 @@ function addLink(from, to) {
 }
 const HINTS = {
   select: "<b>เลือก/ย้าย</b> คลิกอุปกรณ์เพื่อดูรายละเอียด · ลากเพื่อย้าย · ลากพื้นที่ว่างเพื่อเลื่อนผัง",
-  connect: "<b>เชื่อมสาย</b> ลากจากอุปกรณ์ต้นทางไปปลายทาง หรือคลิกต้นทางแล้วคลิกปลายทาง · Esc เพื่อยกเลิก",
+  connect: "<b>เชื่อมสาย</b> ลากจากอุปกรณ์หรือโซนต้นทางไปปลายทาง หรือคลิกต้นทางแล้วคลิกปลายทาง · Esc เพื่อยกเลิก",
   zone: "<b>วาดโซน</b> ลากบนพื้นที่ว่างเพื่อสร้างกรอบ DMZ, VLAN หรือห้อง/ชั้น",
 };
 function setMode(m) {
@@ -826,7 +854,7 @@ svg.addEventListener("pointerdown", (e) => {
   const p = toWorld(e);
   const t = e.target.closest("[data-kind]");
   const kind = t?.dataset.kind, id = t?.dataset.id;
-  if (mode === "connect" && kind === "node") {
+  if (mode === "connect" && (kind === "node" || kind === "zone")) {
     if (pendingFrom && pendingFrom !== id) { const f = pendingFrom; pendingFrom = null; addLink(f, id); return; }
     drag = { type: "link", from: id, cx: p.x, cy: p.y, sx: e.clientX, sy: e.clientY };
   } else if (mode === "zone" && kind !== "zone-resize") {
@@ -875,7 +903,7 @@ function endDrag(e) {
     undoStack.push(d.before); redoStack = []; updateUndoButtons(); persist();
   } else if (d.type === "link") {
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    const t = el && el.closest && el.closest('[data-kind="node"]');
+    const t = el && el.closest && el.closest('[data-kind="node"],[data-kind="zone"]');
     const moved = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 6;
     if (t && t.dataset.id !== d.from) addLink(d.from, t.dataset.id);
     else if (!moved) pendingFrom = d.from;
@@ -1020,7 +1048,7 @@ function exportCSV() {
       if (k === "status") return STATUS[n.status]?.label || n.status;
       if (k === "extra") return t.extra.filter((x) => n.extra[x]).map((x) => `${EXTRA_LABELS[x]}: ${n.extra[x]}`).join("; ");
       if (k === "custom") return n.custom.filter((c) => c.k || c.v).map((c) => `${c.k}: ${c.v}`).join("; ");
-      if (k === "links") return doc.links.filter((l) => l.from === n.id || l.to === n.id).map((l) => findNode(l.from === n.id ? l.to : l.from)?.name).join("; ");
+      if (k === "links") return doc.links.filter((l) => l.from === n.id || l.to === n.id).map((l) => endName(l.from === n.id ? l.to : l.from)).join("; ");
       return n[k];
     });
     rows.push(vals.map(q).join(","));
