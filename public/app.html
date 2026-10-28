@@ -176,6 +176,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
       <button class="btn" id="modeSelect" data-mode="select" title="เลือก / ย้าย (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg>เลือก/ย้าย</button>
       <button class="btn" id="modeConnect" data-mode="connect" title="ลากสายเชื่อม (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg>เชื่อมสาย</button>
       <select id="linkKind" class="sel-sm" aria-label="ชนิดสายเริ่มต้น" title="ชนิดสายที่จะสร้าง"></select>
+      <select id="linkRoute" class="sel-sm" aria-label="รูปแบบเส้นเริ่มต้น" title="รูปแบบเส้นที่จะสร้าง"><option value="straight">เส้นตรง</option><option value="elbow">เส้นหักมุม</option></select>
       <button class="btn" id="modeZone" data-mode="zone" title="วาดโซน / VLAN (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>วาดโซน</button>
     </div>
     <div class="sep hide-sm"></div>
@@ -372,7 +373,7 @@ function sample() {
       l("sw2", "ap2", "eth", { fromPort: "1/1/1" }),
       l("sw2", "prn1", "eth", { fromPort: "1/1/12" }),
       l("sw2", "cam1", "eth", { fromPort: "1/1/20" }),
-      l("z_lan", "z_dmz", "vpn", { label: "Policy LAN → DMZ" }),
+      l("z_lan", "z_dmz", "vpn", { label: "Policy LAN → DMZ", route: "elbow" }),
     ],
     zones: [
       { id: "z_dmz", x: 650, y: 270, w: 180, h: 160, name: "DMZ · 172.16.10.0/24", color: "red", notes: "" },
@@ -536,6 +537,27 @@ function iconTile(type, px) {
   const c = CATS[TYPES[type].cat].color;
   return `<span class="tile" style="background:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${G[type]}</svg></span>`;
 }
+// Polyline through pts with each corner rounded by up to r.
+function roundedPath(pts, r) {
+  let d = `M${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+    const l1 = Math.hypot(p1.x - p0.x, p1.y - p0.y), l2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const rr = Math.min(r, l1 / 2, l2 / 2);
+    if (rr < 0.5) { d += ` L${p1.x} ${p1.y}`; continue; }
+    d += ` L${p1.x + (p0.x - p1.x) / l1 * rr} ${p1.y + (p0.y - p1.y) / l1 * rr} Q${p1.x} ${p1.y} ${p1.x + (p2.x - p1.x) / l2 * rr} ${p1.y + (p2.y - p1.y) / l2 * rr}`;
+  }
+  const last = pts[pts.length - 1];
+  return d + ` L${last.x} ${last.y}`;
+}
+// Elbow links leave a zone through the side facing the other end, level with it where the side allows.
+function elbowAnchor(id, c, other, horiz) {
+  const z = findZone(id);
+  if (!z) return { x: c.x, y: c.y, zone: false };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  if (horiz) return { x: other.x > c.x ? z.x + z.w : z.x, y: clamp(other.y, z.y + 18, z.y + z.h - 18), zone: true };
+  return { x: clamp(other.x, z.x + 18, z.x + z.w - 18), y: other.y > c.y ? z.y + z.h : z.y, zone: true };
+}
 function diagramMarkup(opts = {}) {
   const exp = !!opts.export;
   let out = "";
@@ -556,30 +578,50 @@ function diagramMarkup(opts = {}) {
   for (const l of doc.links) {
     const ca = endCenter(l.from), cb = endCenter(l.to);
     if (!ca || !cb) continue;
-    const a = endAnchor(l.from, cb), b = endAnchor(l.to, ca);
     const k = [l.from, l.to].sort().join("|"), grp = pairs[k], idx = grp.indexOf(l.id);
-    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len, uy = dy / len, px = -uy, py = ux;
     const sign = l.from < l.to ? 1 : -1;
     const off = (idx - (grp.length - 1) / 2) * 14 * sign;
-    const x1 = a.x + px * off, y1 = a.y + py * off, x2 = b.x + px * off, y2 = b.y + py * off;
+    const elbow = l.route === "elbow";
+    let pts, aZone, bZone;
+    if (elbow) {
+      const horiz = Math.abs(cb.x - ca.x) >= Math.abs(cb.y - ca.y);
+      const a = elbowAnchor(l.from, ca, cb, horiz), b = elbowAnchor(l.to, cb, ca, horiz);
+      aZone = a.zone; bZone = b.zone;
+      if (horiz) { const m = (a.x + b.x) / 2 + off; pts = [{ x: a.x, y: a.y + off }, { x: m, y: a.y + off }, { x: m, y: b.y + off }, { x: b.x, y: b.y + off }]; }
+      else { const m = (a.y + b.y) / 2 + off; pts = [{ x: a.x + off, y: a.y }, { x: a.x + off, y: m }, { x: b.x + off, y: m }, { x: b.x + off, y: b.y }]; }
+    } else {
+      const a = endAnchor(l.from, cb), b = endAnchor(l.to, ca);
+      aZone = a.zone; bZone = b.zone;
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1, px = -(b.y - a.y) / len, py = (b.x - a.x) / len;
+      pts = [{ x: a.x + px * off, y: a.y + py * off }, { x: b.x + px * off, y: b.y + py * off }];
+    }
+    const P0 = pts[0], PN = pts[pts.length - 1];
+    const path = roundedPath(pts, 12);
     const t = LINKS[l.kind] || LINKS.eth;
     const col = t.color || (exp ? "#6b7684" : "var(--link)");
     const isSel = !exp && sel && sel.kind === "link" && sel.id === l.id;
     out += `<g data-kind="link" data-id="${l.id}">`;
-    if (isSel) out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--sel)" stroke-opacity=".45" stroke-width="${t.width + 7}" stroke-linecap="round"/>`;
-    out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round"/>`;
-    if (!exp) out += `<line class="hit" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
-    if (a.zone) out += `<circle cx="${x1}" cy="${y1}" r="4.5" fill="${col}"/>`;
-    if (b.zone) out += `<circle cx="${x2}" cy="${y2}" r="4.5" fill="${col}"/>`;
+    if (isSel) out += `<path d="${path}" fill="none" stroke="var(--sel)" stroke-opacity=".45" stroke-width="${t.width + 7}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    out += `<path d="${path}" fill="none" stroke="${col}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round"/>`;
+    if (!exp) out += `<path class="hit" d="${path}"/>`;
+    if (aZone) out += `<circle cx="${P0.x}" cy="${P0.y}" r="4.5" fill="${col}"/>`;
+    if (bZone) out += `<circle cx="${PN.x}" cy="${PN.y}" r="4.5" fill="${col}"/>`;
     // keep text clear of the tile and of the name/IP printed below each node; a zone end only needs a small gap
     const clear = (dirY, zone) => zone ? 24 : 40 + (dirY > 0 ? 34 * dirY : 0);
-    const d1 = Math.min(len * 0.4, clear(uy, a.zone)), d2 = Math.min(len * 0.4, clear(-uy, b.zone));
-    const mx = (x1 + ux * d1 + x2 - ux * d2) / 2, my = (y1 + uy * d1 + y2 - uy * d2) / 2;
-    if (l.label) out += `<text class="llabel" x="${mx}" y="${my + 4}" text-anchor="middle">${esc(l.label)}</text>`;
-    if (len > 150) {
-      if (l.fromPort) out += `<text class="lport" x="${x1 + ux * d1}" y="${y1 + uy * d1 + 3}" text-anchor="middle">${esc(l.fromPort)}</text>`;
-      if (l.toPort) out += `<text class="lport" x="${x2 - ux * d2}" y="${y2 - uy * d2 + 3}" text-anchor="middle">${esc(l.toPort)}</text>`;
+    // a point `dist` along the segment p→q, capped to `cap` of its length
+    const along = (p, q, zone, cap) => {
+      const L = Math.hypot(q.x - p.x, q.y - p.y) || 1, ux = (q.x - p.x) / L, uy = (q.y - p.y) / L;
+      const d = Math.min(L * cap, clear(uy, zone));
+      return { x: p.x + ux * d, y: p.y + uy * d, L };
+    };
+    const cap = elbow ? 0.8 : 0.4;
+    const s1 = along(P0, pts[1], aZone, cap), s2 = along(PN, pts[pts.length - 2], bZone, cap);
+    const mid = elbow ? { x: (pts[1].x + pts[2].x) / 2, y: (pts[1].y + pts[2].y) / 2 } : { x: (s1.x + s2.x) / 2, y: (s1.y + s2.y) / 2 };
+    if (l.label) out += `<text class="llabel" x="${mid.x}" y="${mid.y + 4}" text-anchor="middle">${esc(l.label)}</text>`;
+    const showPorts = elbow ? true : s1.L > 150;
+    if (showPorts) {
+      if (l.fromPort && (!elbow || s1.L > 50)) out += `<text class="lport" x="${s1.x}" y="${s1.y + 3}" text-anchor="middle">${esc(l.fromPort)}</text>`;
+      if (l.toPort && (!elbow || s2.L > 50)) out += `<text class="lport" x="${s2.x}" y="${s2.y + 3}" text-anchor="middle">${esc(l.toPort)}</text>`;
     }
     out += `</g>`;
   }
@@ -731,7 +773,8 @@ function renderInspector() {
     const zoneEnds = (findZone(l.from) ? 1 : 0) + (findZone(l.to) ? 1 : 0);
     h += `<div class="insp-head"><span class="tile" style="background:var(--panel-2);border:1px solid var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg></span><div><h2>${esc(a.name)} ↔ ${esc(b.name)}</h2><small>${zoneEnds === 2 ? "สายเชื่อมระหว่างโซน" : zoneEnds ? "สายเชื่อมอุปกรณ์กับโซน" : "สายเชื่อมต่อ"}</small></div></div>`;
     h += `<div class="fields">`;
-    h += field("ชนิดสาย", "kind", l.kind, { type: "select", full: true, options: Object.entries(LINKS).map(([k, v]) => [k, v.label]) });
+    h += field("ชนิดสาย", "kind", l.kind, { type: "select", options: Object.entries(LINKS).map(([k, v]) => [k, v.label]) });
+    h += field("รูปแบบเส้น", "route", l.route === "elbow" ? "elbow" : "straight", { type: "select", options: [["straight", "เส้นตรง"], ["elbow", "เส้นหักมุม"]] });
     h += field("ป้ายบนสาย (ความเร็ว, VLAN)", "label", l.label, { full: true, ph: "1G, Trunk VLAN 10–40" });
     h += field("พอร์ตฝั่ง " + (a.name || "A"), "fromPort", l.fromPort, { ph: "Gi1/0/1" });
     h += field("พอร์ตฝั่ง " + (b.name || "B"), "toPort", l.toPort, { ph: "port1" });
@@ -829,7 +872,7 @@ function duplicate() {
 function addLink(from, to) {
   if (from === to) return;
   checkpoint();
-  const l = { id: uid("l"), from, to, kind: $("#linkKind").value, label: "", fromPort: "", toPort: "", notes: "" };
+  const l = { id: uid("l"), from, to, kind: $("#linkKind").value, route: $("#linkRoute").value, label: "", fromPort: "", toPort: "", notes: "" };
   doc.links.push(l);
   sel = { kind: "link", id: l.id };
   render(); renderInspector(); persist();
@@ -963,6 +1006,8 @@ function toast(msg) {
 }
 for (const b of document.querySelectorAll("[data-mode]")) b.addEventListener("click", () => setMode(b.dataset.mode));
 $("#linkKind").innerHTML = Object.entries(LINKS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
+try { const r = localStorage.getItem("netplan.route"); if (r === "elbow" || r === "straight") $("#linkRoute").value = r; } catch (e) {}
+$("#linkRoute").addEventListener("change", (e) => { try { localStorage.setItem("netplan.route", e.target.value); } catch (err) {} });
 $("#undoBtn").onclick = undo; $("#redoBtn").onclick = redo;
 $("#zoomIn").onclick = () => { const r = svg.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); };
 $("#zoomOut").onclick = () => { const r = svg.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); };
