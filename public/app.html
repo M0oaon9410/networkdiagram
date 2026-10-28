@@ -111,6 +111,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .f input:focus, .f select:focus, .f textarea:focus { border-color: var(--accent); outline: none; background: var(--panel); }
 .f .mono { font-family: var(--font-mono); font-size: 13px; }
 .f textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+.colorrow { display: flex; gap: 8px; align-items: center; }
+.colorrow input[type="color"] { width: 44px; height: 34px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); cursor: pointer; flex: none; }
+.colorrow .hexbox { width: 100px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+.swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-top: 6px; }
+.sw { aspect-ratio: 1; max-width: 100%; border-radius: 5px; border: 1px solid var(--line); cursor: pointer; padding: 0; }
+.sw:hover { outline: 2px solid var(--fg); outline-offset: 1px; }
 .custom-row { display: grid; grid-template-columns: 1fr 1.3fr auto; gap: 6px; margin-bottom: 6px; }
 .custom-row input { min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
 .icon-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; width: 32px; cursor: pointer; display: grid; place-items: center; }
@@ -276,7 +282,7 @@ const G = {
   loadbalancer: '<circle cx="5.5" cy="12" r="2.2"/><circle cx="18.5" cy="5.5" r="2.2"/><circle cx="18.5" cy="12" r="2.2"/><circle cx="18.5" cy="18.5" r="2.2"/><path d="M7.7 12h8.6M7.5 11 16.4 6.5M7.5 13l8.9 4.5"/>',
   coreswitch: '<rect x="3" y="9" width="18" height="10" rx="1.5"/><path d="M5 9V6h14v3"/><path d="M7 12.5h9l-1.8-1.6M17 15.5H8l1.8 1.6"/>',
   switch: '<rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 10.5h9l-1.8-1.6M17 13.5H8l1.8 1.6"/>',
-  ap: '<path d="M4 15h16v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8.8 10.4a4.6 4.6 0 0 1 6.4 0M6.3 7.8a8.2 8.2 0 0 1 11.4 0"/><circle cx="12" cy="12.6" r=".9" fill="#fff"/>',
+  ap: '<path d="M4 15h16v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8.8 10.4a4.6 4.6 0 0 1 6.4 0M6.3 7.8a8.2 8.2 0 0 1 11.4 0"/><circle cx="12" cy="12.6" r=".9" fill="currentColor"/>',
   server: '<rect x="5" y="3.5" width="14" height="5" rx="1"/><rect x="5" y="9.5" width="14" height="5" rx="1"/><rect x="5" y="15.5" width="14" height="5" rx="1"/><path d="M8 6h.01M8 12h.01M8 18h.01M12 6h4M12 12h4M12 18h4"/>',
   database: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
   storage: '<rect x="3.5" y="6" width="17" height="12" rx="1.5"/><path d="M7 9v6M10 9v6M13 9v6M17 15h.01"/>',
@@ -330,6 +336,15 @@ const LINKS = {
   stack: { label: "Stack / HA",     color: "#2f7a4c", width: 4.5, dash: "" },
 };
 const ZONE_COLORS = { blue: "#3b62c9", green: "#2f8a55", red: "#c2462b", amber: "#c98a0b", violet: "#7a4fb8", slate: "#5a6472" };
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+const nodeColor = (n) => (HEX_RE.test(n.color || "") ? n.color : CATS[TYPES[n.type].cat].color);
+const zoneColor = (z) => ZONE_COLORS[z.color] || (HEX_RE.test(z.color || "") ? z.color : ZONE_COLORS.blue);
+// Dark ink on light fills so the device icon stays readable on any chosen color.
+function inkFor(hex) {
+  const v = parseInt(hex.slice(1), 16), r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+  const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.42 ? "#18212d" : "#ffffff";
+}
 const ZONE_COLOR_LABELS = { blue: "น้ำเงิน", green: "เขียว", red: "แดง", amber: "เหลืองอำพัน", violet: "ม่วง", slate: "เทา" };
 
 /* ---------- Sample ---------- */
@@ -427,7 +442,7 @@ function normalize(d) {
   }
   for (const z of d.zones || []) {
     if (!z) continue;
-    out.zones.push({ name: "", notes: "", ...z, id: z.id || uid("z"), x: +z.x || 0, y: +z.y || 0, w: Math.max(60, +z.w || 200), h: Math.max(40, +z.h || 120), color: ZONE_COLORS[z.color] ? z.color : "blue" });
+    out.zones.push({ name: "", notes: "", ...z, id: z.id || uid("z"), x: +z.x || 0, y: +z.y || 0, w: Math.max(60, +z.w || 200), h: Math.max(40, +z.h || 120), color: ZONE_COLORS[z.color] || HEX_RE.test(z.color || "") ? z.color : "blue" });
   }
   const ids = new Set([...out.nodes.map((n) => n.id), ...out.zones.map((z) => z.id)]);
   for (const l of d.links || []) {
@@ -529,13 +544,13 @@ function fit() {
 }
 
 /* ---------- Rendering ---------- */
-function glyph(type, size = 32, x = -16, y = -16) {
+function glyph(type, size = 32, x = -16, y = -16, ink = "#fff") {
   const s = size / 24;
-  return `<g transform="translate(${x} ${y}) scale(${s})" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${G[type]}</g>`;
+  return `<g transform="translate(${x} ${y}) scale(${s})" fill="none" color="${ink}" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${G[type]}</g>`;
 }
-function iconTile(type, px) {
-  const c = CATS[TYPES[type].cat].color;
-  return `<span class="tile" style="background:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${G[type]}</svg></span>`;
+function iconTile(type, color) {
+  const c = color || CATS[TYPES[type].cat].color;
+  return `<span class="tile" style="background:${c};color:${inkFor(c)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${G[type]}</svg></span>`;
 }
 /* ---------- Elbow routing ----------
    Orthogonal A* over a sparse grid built from obstacle edges. Zones and devices
@@ -730,7 +745,7 @@ function diagramMarkup(opts = {}) {
   let out = "";
   // zones
   for (const z of doc.zones) {
-    const c = ZONE_COLORS[z.color];
+    const c = zoneColor(z);
     const isSel = !exp && sel && sel.kind === "zone" && sel.id === z.id;
     const isPend = !exp && pendingFrom === z.id;
     out += `<g data-kind="zone" data-id="${z.id}">`;
@@ -799,14 +814,14 @@ function diagramMarkup(opts = {}) {
   }
   // nodes
   for (const n of doc.nodes) {
-    const c = CATS[TYPES[n.type].cat].color;
+    const c = nodeColor(n);
     const isSel = !exp && sel && sel.kind === "node" && sel.id === n.id;
     const isPend = !exp && pendingFrom === n.id;
     const planned = n.status === "planned";
     out += `<g class="node" data-kind="node" data-id="${n.id}" transform="translate(${n.x} ${n.y})"${planned ? ' opacity=".7"' : ""}>`;
     if (isSel || isPend) out += `<rect class="ring" x="-33" y="-33" width="66" height="66" rx="14"${isPend ? ' stroke-dasharray="5 4"' : ""}/>`;
     out += `<rect x="-26" y="-26" width="52" height="52" rx="11" fill="${c}"${planned ? ` fill-opacity=".55" stroke="${c}" stroke-width="2" stroke-dasharray="5 3"` : ""}/>`;
-    out += glyph(n.type, 32, -16, -16);
+    out += glyph(n.type, 32, -16, -16, inkFor(c));
     const st = STATUS[n.status];
     if (st && n.status !== "active") out += `<circle class="statdot" cx="22" cy="-22" r="5.5" fill="${st.color}"/>`;
     out += `<text class="nlabel" y="44" text-anchor="middle">${esc(n.name || TYPES[n.type].label)}</text>`;
@@ -895,23 +910,34 @@ function field(label, key, val, o = {}) {
   if (o.type === "textarea") return `<div class="${cls}"><label for="${id}">${esc(label)}</label><textarea id="${id}" data-field="${key}" rows="3">${esc(val)}</textarea></div>`;
   return `<div class="${cls}"><label for="${id}">${esc(label)}</label><input id="${id}" class="${mono.trim()}" data-field="${key}" value="${esc(val)}"${o.ph ? ` placeholder="${esc(o.ph)}"` : ""} autocomplete="off" spellcheck="false"></div>`;
 }
+const SWATCHES = ["#2f7a4c", "#1b7a8c", "#3a5a99", "#3b62c9", "#7a4fb8", "#b0418f", "#c2462b", "#d97706", "#c98a0b", "#7d8b1f", "#5a6472", "#2b2f36", "#0e9f6e", "#0891b2", "#e11d48", "#a16207"];
+// Full-range color picker (any of 16.7M colors) with a hex box, quick swatches and, for devices, a reset to the type color.
+function colorField(cur, custom) {
+  let h = `<div class="f full"><label for="f_color">สี</label><div class="colorrow">`;
+  h += `<input type="color" id="f_color" data-color value="${cur}" aria-label="เลือกสี">`;
+  h += `<input id="f_colorhex" class="mono hexbox" data-colorhex value="${cur}" maxlength="7" aria-label="รหัสสี" spellcheck="false" autocomplete="off">`;
+  h += `</div><div class="swatches">${SWATCHES.map((c) => `<button class="sw" data-swatch="${c}" style="background:${c}" title="${c}" aria-label="สี ${c}"></button>`).join("")}</div>`;
+  if (sel.kind === "node") h += `<button class="btn" data-color-reset style="justify-self:start;margin-top:6px"${custom ? "" : " disabled"}>ใช้สีตามชนิดอุปกรณ์</button>`;
+  return h + `</div>`;
+}
 const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
 function linkRow(l, selfId) {
   const mine = l.from === selfId;
   const myPort = mine ? l.fromPort : l.toPort, otherPort = mine ? l.toPort : l.fromPort;
-  return `<button class="btn" data-goto-link="${l.id}" style="justify-content:space-between;width:100%"><span>${esc(myPort || "—")} → ${esc(endName(mine ? l.to : l.from))}${otherPort ? " (" + esc(otherPort) + ")" : ""}</span><span class="muted">${esc(LINKS[l.kind].label)}</span></button>`;
+  return `<button class="btn" data-goto-link="${l.id}" style="justify-content:space-between;width:100%;white-space:normal;text-align:left;gap:10px"><span>${esc(myPort || "—")} → ${esc(endName(mine ? l.to : l.from))}${otherPort ? " (" + esc(otherPort) + ")" : ""}</span><span class="muted">${esc(LINKS[l.kind].label)}</span></button>`;
 }
 function renderInspector() {
   let h = "";
   if (sel && sel.kind === "node") {
     const n = findNode(sel.id), t = TYPES[n.type];
     const linked = doc.links.filter((l) => l.from === n.id || l.to === n.id);
-    h += `<div class="insp-head">${iconTile(n.type)}<div><h2>${esc(n.name || t.label)}</h2><small>${esc(t.label)} · ${esc(CATS[t.cat].label)}</small></div></div>`;
+    h += `<div class="insp-head">${iconTile(n.type, nodeColor(n))}<div><h2>${esc(n.name || t.label)}</h2><small>${esc(t.label)} · ${esc(CATS[t.cat].label)}</small></div></div>`;
     h += `<div class="sec">ข้อมูลหลัก</div><div class="fields">`;
     h += field("ชื่ออุปกรณ์ / Hostname", "name", n.name, { full: true });
     h += field("ชนิดอุปกรณ์", "type", n.type, { type: "select", options: Object.entries(TYPES).map(([k, v]) => [k, v.label]) });
     h += field("สถานะ", "status", n.status, { type: "select", options: Object.entries(STATUS).map(([k, v]) => [k, v.label]) });
+    h += colorField(nodeColor(n), !!n.color);
     h += `</div><div class="sec">เครือข่าย</div><div class="fields">`;
     h += field("IP Address", "ip", n.ip, { ph: "10.0.0.10" });
     h += field("Subnet / Mask", "mask", n.mask, { ph: "/24" });
@@ -955,10 +981,10 @@ function renderInspector() {
   } else if (sel && sel.kind === "zone") {
     const z = findZone(sel.id);
     const inside = doc.nodes.filter((n) => n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h);
-    h += `<div class="insp-head"><span class="tile" style="background:${ZONE_COLORS[z.color]}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg></span><div><h2>${esc(z.name || "โซน")}</h2><small>โซน / VLAN / พื้นที่ · มีอุปกรณ์ ${inside.length} ชิ้น</small></div></div>`;
+    h += `<div class="insp-head"><span class="tile" style="background:${zoneColor(z)};color:${inkFor(zoneColor(z))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg></span><div><h2>${esc(z.name || "โซน")}</h2><small>โซน / VLAN / พื้นที่ · มีอุปกรณ์ ${inside.length} ชิ้น</small></div></div>`;
     h += `<div class="fields">`;
     h += field("ชื่อโซน", "name", z.name, { full: true, ph: "DMZ · 172.16.10.0/24" });
-    h += field("สี", "color", z.color, { type: "select", full: true, options: Object.entries(ZONE_COLOR_LABELS) });
+    h += colorField(zoneColor(z), false);
     h += field("หมายเหตุ", "notes", z.notes, { type: "textarea", full: true });
     h += `</div><p class="muted" style="font-size:12.5px;line-height:1.55">ลากที่กรอบเพื่อย้ายโซนพร้อมอุปกรณ์ข้างใน ลากมุมขวาล่างเพื่อปรับขนาด</p>`;
     const zl = doc.links.filter((l) => l.from === z.id || l.to === z.id);
@@ -1007,6 +1033,14 @@ inspector.addEventListener("input", (e) => {
     else obj[f] = el.value;
     if (el.tagName === "SELECT") renderInspector();
     else if (f === "name") { const h2 = inspector.querySelector(".insp-head h2"); if (h2) h2.textContent = el.value || "—"; }
+  } else if (el.dataset.color != null || el.dataset.colorhex != null) {
+    const v = el.value.trim();
+    if (!HEX_RE.test(v)) return;
+    obj.color = v.toLowerCase();
+    const other = inspector.querySelector(el.dataset.color != null ? "#f_colorhex" : "#f_color");
+    if (other) other.value = obj.color;
+    const tile = inspector.querySelector(".insp-head .tile");
+    if (tile) { tile.style.background = obj.color; tile.style.color = inkFor(obj.color); }
   } else if (el.dataset.custom != null) {
     obj.custom[+el.dataset.custom][el.dataset.part] = el.value;
   }
@@ -1015,6 +1049,12 @@ inspector.addEventListener("input", (e) => {
 inspector.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.id === "delBtn") return deleteSelected();
+  if (b.dataset.swatch || b.dataset.colorReset != null) {
+    const obj = sel.kind === "node" ? findNode(sel.id) : findZone(sel.id);
+    checkpoint();
+    if (b.dataset.swatch) obj.color = b.dataset.swatch; else delete obj.color;
+    render(); renderInspector(); persist(); return;
+  }
   if (b.id === "dupBtn") return duplicate();
   if (b.id === "addCustom") { checkpoint(); findNode(sel.id).custom.push({ k: "", v: "" }); renderInspector(); const ins = inspector.querySelectorAll("#customRows input[data-part=k]"); ins[ins.length - 1]?.focus(); persist(); return; }
   if (b.dataset.customDel != null) { checkpoint(); findNode(sel.id).custom.splice(+b.dataset.customDel, 1); renderInspector(); persist(); return; }
