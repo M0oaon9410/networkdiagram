@@ -537,6 +537,173 @@ function iconTile(type, px) {
   const c = CATS[TYPES[type].cat].color;
   return `<span class="tile" style="background:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${G[type]}</svg></span>`;
 }
+/* ---------- Elbow routing ----------
+   Orthogonal A* over a sparse grid built from obstacle edges. Zones and devices
+   that are not part of the link are obstacles; segments already used by earlier
+   links cost extra so parallel cables spread into separate lanes. */
+const R_MARGIN = 12, R_LANE = 14, R_BEND = 46, R_STUB = 20;
+function simpleElbow(l, ca, cb, off) {
+  const horiz = Math.abs(cb.x - ca.x) >= Math.abs(cb.y - ca.y);
+  const a = elbowAnchor(l.from, ca, cb, horiz), b = elbowAnchor(l.to, cb, ca, horiz);
+  if (horiz) { const m = (a.x + b.x) / 2 + off; return [{ x: a.x, y: a.y + off }, { x: m, y: a.y + off }, { x: m, y: b.y + off }, { x: b.x, y: b.y + off }]; }
+  const m = (a.y + b.y) / 2 + off;
+  return [{ x: a.x + off, y: a.y }, { x: a.x + off, y: m }, { x: b.x + off, y: m }, { x: b.x + off, y: b.y }];
+}
+function markUsed(used, pts) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i], q = pts[i + 1];
+    if (Math.abs(p.y - q.y) < 0.5) { const k = Math.round(p.y); (used.h.get(k) || used.h.set(k, []).get(k)).push([Math.min(p.x, q.x), Math.max(p.x, q.x)]); }
+    else if (Math.abs(p.x - q.x) < 0.5) { const k = Math.round(p.x); (used.v.get(k) || used.v.set(k, []).get(k)).push([Math.min(p.y, q.y), Math.max(p.y, q.y)]); }
+  }
+}
+function usedOverlap(list, a, b) {
+  if (!list) return 0;
+  let o = 0;
+  for (const [u0, u1] of list) o += Math.max(0, Math.min(b, u1) - Math.max(a, u0));
+  return o;
+}
+// Exit points of a link end. A device is left from its center in any direction;
+// a zone is left from one of its four sides through a short stub.
+function routeEnds(id, c, other, otherId) {
+  const n = findNode(id);
+  if (n) return [{ p: { x: c.x, y: c.y }, dir: -1, pre: [], cost: 0 }];
+  const z = findZone(id), oz = findZone(otherId);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  let ax = clamp(other.x, z.x + 18, z.x + z.w - 18), ay = clamp(other.y, z.y + 18, z.y + z.h - 18);
+  if (oz) {
+    // two zones facing each other: meet at the middle of their shared span so the cable runs straight
+    const x0 = Math.max(z.x, oz.x) + 18, x1 = Math.min(z.x + z.w, oz.x + oz.w) - 18;
+    const y0 = Math.max(z.y, oz.y) + 18, y1 = Math.min(z.y + z.h, oz.y + oz.h) - 18;
+    if (x1 >= x0) ax = (x0 + x1) / 2;
+    if (y1 >= y0) ay = (y0 + y1) / 2;
+  }
+  const sides = [
+    { a: { x: z.x + z.w, y: ay }, p: { x: z.x + z.w + R_STUB, y: ay }, dir: 0, face: other.x > z.x + z.w },
+    { a: { x: ax, y: z.y + z.h }, p: { x: ax, y: z.y + z.h + R_STUB }, dir: 1, face: other.y > z.y + z.h },
+    { a: { x: z.x, y: ay }, p: { x: z.x - R_STUB, y: ay }, dir: 2, face: other.x < z.x },
+    { a: { x: ax, y: z.y }, p: { x: ax, y: z.y - R_STUB }, dir: 3, face: other.y < z.y },
+  ];
+  return sides.map((s) => ({ p: s.p, dir: s.dir, pre: [s.a], cost: s.face ? 0 : 60 }));
+}
+function routeElbow(l, ca, cb, used) {
+  const starts = routeEnds(l.from, ca, cb, l.to), goals = routeEnds(l.to, cb, ca, l.from);
+  for (const pad of [260, 900]) {
+    const r = routeOnce(l, starts, goals, used, pad);
+    if (r) return r;
+  }
+  return null;
+}
+function routeOnce(l, starts, goals, used, pad) {
+  const inside = (p, z) => p.x > z.x && p.x < z.x + z.w && p.y > z.y && p.y < z.y + z.h;
+  const ends = [...starts, ...goals].map((e) => e.p);
+  let wx0 = Infinity, wy0 = Infinity, wx1 = -Infinity, wy1 = -Infinity;
+  for (const p of ends) { wx0 = Math.min(wx0, p.x); wy0 = Math.min(wy0, p.y); wx1 = Math.max(wx1, p.x); wy1 = Math.max(wy1, p.y); }
+  wx0 -= pad; wy0 -= pad; wx1 += pad; wy1 += pad;
+  const ca = starts[0].pre[0] ? endCenter(l.from) : starts[0].p, cb = goals[0].pre[0] ? endCenter(l.to) : goals[0].p;
+  const obs = [];
+  for (const z of doc.zones) {
+    const own = z.id === l.from || z.id === l.to;
+    if (!own && (inside(ca, z) || inside(cb, z))) continue;            // a zone holding an end must be crossed
+    if (own && inside(z.id === l.from ? cb : ca, z)) return null;       // the other end sits in this zone: keep it simple
+    obs.push({ x0: z.x - R_MARGIN, y0: z.y - R_MARGIN, x1: z.x + z.w + R_MARGIN, y1: z.y + z.h + R_MARGIN });
+  }
+  for (const n of doc.nodes) {
+    if (n.id === l.from || n.id === l.to) continue;
+    obs.push({ x0: n.x - 34, y0: n.y - 34, x1: n.x + 34, y1: n.y + 64 });
+  }
+  const win = obs.filter((o) => o.x1 > wx0 && o.x0 < wx1 && o.y1 > wy0 && o.y0 < wy1);
+  for (const p of ends) for (const o of win) if (p.x > o.x0 && p.x < o.x1 && p.y > o.y0 && p.y < o.y1) {
+    // an exit point is buried in an obstacle; drop that exit
+    starts = starts.filter((e) => e.p !== p); goals = goals.filter((e) => e.p !== p);
+  }
+  if (!starts.length || !goals.length) return null;
+  const xsSet = new Set([wx0, wx1]), ysSet = new Set([wy0, wy1]);
+  for (const o of win) {
+    for (const v of [o.x0, o.x1, o.x0 - R_LANE, o.x1 + R_LANE]) xsSet.add(v);
+    for (const v of [o.y0, o.y1, o.y0 - R_LANE, o.y1 + R_LANE]) ysSet.add(v);
+  }
+  for (const e of [...starts, ...goals]) { xsSet.add(e.p.x); ysSet.add(e.p.y); }
+  // midway lines between the ends give the classic three-segment shape when nothing is in the way
+  const sp = starts[0].p, gp = goals[0].p;
+  xsSet.add((sp.x + gp.x) / 2); ysSet.add((sp.y + gp.y) / 2);
+  const xs = [...xsSet].filter((v) => v >= wx0 && v <= wx1).sort((a, b) => a - b);
+  const ys = [...ysSet].filter((v) => v >= wy0 && v <= wy1).sort((a, b) => a - b);
+  const nx = xs.length, ny = ys.length, N = nx * ny;
+  const hB = new Uint8Array(N), vB = new Uint8Array(N);
+  for (const o of win) {
+    for (let j = 0; j < ny; j++) {
+      const y = ys[j];
+      if (y > o.y0 && y < o.y1) for (let i = 0; i < nx - 1; i++) if (xs[i] >= o.x0 && xs[i + 1] <= o.x1) hB[j * nx + i] = 1;
+    }
+    for (let i = 0; i < nx; i++) {
+      const x = xs[i];
+      if (x > o.x0 && x < o.x1) for (let j = 0; j < ny - 1; j++) if (ys[j] >= o.y0 && ys[j + 1] <= o.y1) vB[j * nx + i] = 1;
+    }
+  }
+  const xi = new Map(xs.map((v, i) => [v, i])), yi = new Map(ys.map((v, i) => [v, i]));
+  const at = (p) => yi.get(p.y) * nx + xi.get(p.x);
+  const goalAt = new Map();
+  for (const g of goals) goalAt.set(at(g.p), g);
+  const h = (i, j) => { let m = Infinity; for (const g of goals) m = Math.min(m, Math.abs(xs[i] - g.p.x) + Math.abs(ys[j] - g.p.y)); return m; };
+  const S = N * 5, dist = new Float64Array(S).fill(Infinity), prev = new Int32Array(S).fill(-1);
+  const heap = [];
+  const push = (f, s) => { heap.push([f, s]); let k = heap.length - 1; while (k > 0) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const a = 2 * k + 1, b = a + 1; let m = k; if (a < heap.length && heap[a][0] < heap[m][0]) m = a; if (b < heap.length && heap[b][0] < heap[m][0]) m = b; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  const startOf = new Map();
+  for (const st of starts) {
+    const idx = at(st.p), d = st.dir < 0 ? 4 : st.dir, s = idx * 5 + d;
+    if (st.cost < dist[s]) { dist[s] = st.cost; startOf.set(s, st); push(st.cost + h(idx % nx, (idx / nx) | 0), s); }
+  }
+  const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
+  let best = Infinity, bestS = -1, bestGoal = null, guard = 0;
+  while (heap.length && guard++ < 200000) {
+    const [f, s] = pop();
+    if (f >= best) break;
+    const g = dist[s];
+    if (f - h(((s / 5) | 0) % nx, (((s / 5) | 0) / nx) | 0) > g + 1e-6) continue;
+    const idx = (s / 5) | 0, d = s % 5, i = idx % nx, j = (idx / nx) | 0;
+    const goal = goalAt.get(idx);
+    if (goal) {
+      const inDir = goal.dir < 0 ? -1 : (goal.dir + 2) % 4;
+      const total = g + goal.cost + (inDir < 0 || d === inDir || d === 4 ? 0 : R_BEND);
+      if (total < best) { best = total; bestS = s; bestGoal = goal; }
+    }
+    for (let nd = 0; nd < 4; nd++) {
+      if (d !== 4 && (nd + 2) % 4 === d) continue;
+      const ni = i + DX[nd], nj = j + DY[nd];
+      if (ni < 0 || nj < 0 || ni >= nx || nj >= ny) continue;
+      if (nd === 0 && hB[j * nx + i]) continue;
+      if (nd === 2 && hB[j * nx + ni]) continue;
+      if (nd === 1 && vB[j * nx + i]) continue;
+      if (nd === 3 && vB[nj * nx + i]) continue;
+      const len = Math.abs(xs[ni] - xs[i]) + Math.abs(ys[nj] - ys[j]);
+      let c = len + (d !== 4 && d !== nd ? R_BEND : 0);
+      if (nd % 2 === 0) c += 2.5 * usedOverlap(used.h.get(Math.round(ys[j])), Math.min(xs[i], xs[ni]), Math.max(xs[i], xs[ni]));
+      else c += 2.5 * usedOverlap(used.v.get(Math.round(xs[i])), Math.min(ys[j], ys[nj]), Math.max(ys[j], ys[nj]));
+      const ns = (nj * nx + ni) * 5 + nd, ng = g + c;
+      if (ng < dist[ns]) { dist[ns] = ng; prev[ns] = s; push(ng + h(ni, nj), ns); }
+    }
+  }
+  if (bestS < 0) return null;
+  const path = [];
+  let s = bestS, first = s;
+  while (s >= 0) { const idx = (s / 5) | 0; path.push({ x: xs[idx % nx], y: ys[(idx / nx) | 0] }); first = s; s = prev[s]; }
+  path.reverse();
+  const st = startOf.get(first);
+  const pts = [...(st ? st.pre : []), ...path, ...bestGoal.pre];
+  // drop repeated and collinear points
+  const out = [];
+  for (const p of pts) {
+    const q = out[out.length - 1];
+    if (q && Math.abs(q.x - p.x) < 0.01 && Math.abs(q.y - p.y) < 0.01) continue;
+    if (out.length >= 2) {
+      const o = out[out.length - 2];
+      if ((Math.abs(o.x - q.x) < 0.01 && Math.abs(q.x - p.x) < 0.01) || (Math.abs(o.y - q.y) < 0.01 && Math.abs(q.y - p.y) < 0.01)) out.pop();
+    }
+    out.push(p);
+  }
+  return out.length >= 2 ? out : null;
+}
 // Polyline through pts with each corner rounded by up to r.
 function roundedPath(pts, r) {
   let d = `M${pts[0].x} ${pts[0].y}`;
@@ -573,7 +740,7 @@ function diagramMarkup(opts = {}) {
     if (isSel) out += `<rect data-kind="zone-resize" data-id="${z.id}" x="${z.x + z.w - 9}" y="${z.y + z.h - 9}" width="16" height="16" rx="3" fill="var(--panel)" stroke="${c}" stroke-width="2" style="cursor:nwse-resize"/>`;
   }
   // links
-  const pairs = {};
+  const pairs = {}, used = { h: new Map(), v: new Map() };
   for (const l of doc.links) { const k = [l.from, l.to].sort().join("|"); (pairs[k] ||= []).push(l.id); }
   for (const l of doc.links) {
     const ca = endCenter(l.from), cb = endCenter(l.to);
@@ -584,11 +751,9 @@ function diagramMarkup(opts = {}) {
     const elbow = l.route === "elbow";
     let pts, aZone, bZone;
     if (elbow) {
-      const horiz = Math.abs(cb.x - ca.x) >= Math.abs(cb.y - ca.y);
-      const a = elbowAnchor(l.from, ca, cb, horiz), b = elbowAnchor(l.to, cb, ca, horiz);
-      aZone = a.zone; bZone = b.zone;
-      if (horiz) { const m = (a.x + b.x) / 2 + off; pts = [{ x: a.x, y: a.y + off }, { x: m, y: a.y + off }, { x: m, y: b.y + off }, { x: b.x, y: b.y + off }]; }
-      else { const m = (a.y + b.y) / 2 + off; pts = [{ x: a.x + off, y: a.y }, { x: a.x + off, y: m }, { x: b.x + off, y: m }, { x: b.x + off, y: b.y }]; }
+      pts = routeElbow(l, ca, cb, used) || simpleElbow(l, ca, cb, off);
+      aZone = !!findZone(l.from); bZone = !!findZone(l.to);
+      markUsed(used, pts);
     } else {
       const a = endAnchor(l.from, cb), b = endAnchor(l.to, ca);
       aZone = a.zone; bZone = b.zone;
@@ -616,7 +781,14 @@ function diagramMarkup(opts = {}) {
     };
     const cap = elbow ? 0.8 : 0.4;
     const s1 = along(P0, pts[1], aZone, cap), s2 = along(PN, pts[pts.length - 2], bZone, cap);
-    const mid = elbow ? { x: (pts[1].x + pts[2].x) / 2, y: (pts[1].y + pts[2].y) / 2 } : { x: (s1.x + s2.x) / 2, y: (s1.y + s2.y) / 2 };
+    let mid = { x: (s1.x + s2.x) / 2, y: (s1.y + s2.y) / 2 };
+    if (elbow) {
+      let best = -1;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const L = Math.abs(pts[i + 1].x - pts[i].x) + Math.abs(pts[i + 1].y - pts[i].y);
+        if (L > best) { best = L; mid = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 }; }
+      }
+    }
     if (l.label) out += `<text class="llabel" x="${mid.x}" y="${mid.y + 4}" text-anchor="middle">${esc(l.label)}</text>`;
     const showPorts = elbow ? true : s1.L > 150;
     if (showPorts) {
