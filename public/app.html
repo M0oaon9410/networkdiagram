@@ -196,6 +196,37 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .title-input { width: 100%; order: 10; }
   .hide-sm { display: none; }
 }
+/* sign-in screen, account menu, read-only mode */
+.auth { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: grid; place-items: center; padding: 16px; overflow-y: auto; }
+.auth-card { width: min(400px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px; display: grid; gap: 14px; }
+.auth-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.auth h1 { margin: 0; font-size: 19px; }
+.auth p { margin: 0; line-height: 1.6; }
+.auth form { display: grid; gap: 10px; }
+.auth .f input { padding: 9px 10px; font-size: 15px; }
+.auth .btn.primary { justify-content: center; padding: 9px 12px; font-size: 15px; }
+.auth-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: 13px; }
+.linkbtn { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.note { border-radius: 8px; padding: 9px 11px; font-size: 13.5px; line-height: 1.55; border: 1px solid var(--line); background: var(--panel-2); }
+.note.err { border-color: var(--danger); color: var(--danger); }
+.note.ok { border-color: #2f9e5a; }
+.usermenu { position: relative; }
+.usermenu summary { list-style: none; }
+.usermenu summary::-webkit-details-marker { display: none; }
+.usermenu .avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+.usermenu .menu { position: absolute; right: 0; top: calc(100% + 6px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; min-width: 220px; display: grid; gap: 2px; z-index: 40; box-shadow: 0 8px 24px rgb(0 0 0 / .14); }
+.usermenu .menu .who { padding: 6px 8px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 13px; }
+.usermenu .menu .who small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.usermenu .menu .btn { border: none; justify-content: flex-start; width: 100%; }
+.role { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.role.admin { color: var(--accent); border-color: var(--accent); }
+.user-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.user-row b, .user-row small { display: block; overflow-wrap: anywhere; }
+.user-row small { color: var(--muted); font-size: 12px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.readonly .palette, .readonly .edit-only { display: none !important; }
+.readonly .main { grid-template-columns: minmax(0, 1fr) 320px; }
+@media (max-width: 860px) { .user-row { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
@@ -208,19 +239,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
     <input id="docTitle" class="title-input" aria-label="ชื่อผัง" maxlength="120">
     <div class="sep hide-sm"></div>
     <div class="grp" role="group" aria-label="โหมด">
-      <button class="btn" id="modeSelect" data-mode="select" title="เลือก / ย้าย (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg>เลือก/ย้าย</button>
-      <button class="btn" id="modeConnect" data-mode="connect" title="ลากสายเชื่อม (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg>เชื่อมสาย</button>
-      <select id="linkKind" class="sel-sm" aria-label="ชนิดสายเริ่มต้น" title="ชนิดสายที่จะสร้าง"></select>
-      <select id="linkRoute" class="sel-sm" aria-label="รูปแบบเส้นเริ่มต้น" title="รูปแบบเส้นที่จะสร้าง"><option value="straight"></option><option value="elbow"></option></select>
-      <button class="btn" id="modeZone" data-mode="zone" title="วาดโซน / VLAN (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>วาดโซน</button>
+      <button class="btn edit-only" id="modeSelect" data-mode="select" title="เลือก / ย้าย (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg>เลือก/ย้าย</button>
+      <button class="btn edit-only" id="modeConnect" data-mode="connect" title="ลากสายเชื่อม (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg>เชื่อมสาย</button>
+      <select id="linkKind" class="sel-sm edit-only" aria-label="ชนิดสายเริ่มต้น" title="ชนิดสายที่จะสร้าง"></select>
+      <select id="linkRoute" class="sel-sm edit-only" aria-label="รูปแบบเส้นเริ่มต้น" title="รูปแบบเส้นที่จะสร้าง"><option value="straight"></option><option value="elbow"></option></select>
+      <button class="btn edit-only" id="modeZone" data-mode="zone" title="วาดโซน / VLAN (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>วาดโซน</button>
     </div>
-    <div class="sep hide-sm"></div>
-    <div class="grp">
+    <div class="sep hide-sm edit-only"></div>
+    <div class="grp edit-only">
       <button class="btn" id="undoBtn" title="ย้อนกลับ (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/></svg><span class="hide-sm">ย้อน</span></button>
       <button class="btn" id="redoBtn" title="ทำซ้ำ (Ctrl+Y)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 7 5 5-5 5"/><path d="M20 12H10a6 6 0 0 0 0 12"/></svg><span class="hide-sm">ทำซ้ำ</span></button>
     </div>
     <div class="spacer"></div>
     <div class="grp seg" role="group" aria-label="ภาษา / Language" id="langSeg"><button class="btn" data-lang="th" lang="th">ไทย</button><button class="btn" data-lang="en" lang="en">EN</button></div>
+    <details class="usermenu" id="userMenu" hidden><summary class="btn"><span class="avatar" id="userInitial"></span><span class="hide-sm" id="userName"></span></summary><div class="menu" id="userMenuBody"></div></details>
     <span class="server-pill" id="serverPill" title=""><i></i><span>บันทึกในเบราว์เซอร์</span></span>
     <div class="grp">
       <button class="btn" id="filesBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>ผังทั้งหมด</button>
@@ -232,7 +264,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
         <option value="csv">รายการอุปกรณ์ CSV</option>
         <option value="json">ไฟล์ผัง JSON</option>
       </select>
-      <button class="btn danger" id="newBtn" title="เริ่มผังใหม่">ผังใหม่</button>
+      <button class="btn danger edit-only" id="newBtn" title="เริ่มผังใหม่">ผังใหม่</button>
     </div>
   </header>
 
@@ -264,7 +296,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
         <span id="zoomVal">100%</span>
         <button class="btn" id="zoomIn" title="ซูมเข้า" aria-label="ซูมเข้า">+</button>
         <button class="btn" id="zoomFit" title="พอดีจอ">พอดีจอ</button>
-        <button class="btn" id="multiBtn" aria-pressed="false" title="เลือกหลายชิ้น">เลือกหลายชิ้น</button>
+        <button class="btn edit-only" id="multiBtn" aria-pressed="false" title="เลือกหลายชิ้น">เลือกหลายชิ้น</button>
       </div>
     </section>
     <aside class="inspector" id="inspector" aria-label="รายละเอียด"></aside>
@@ -277,10 +309,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
     <p class="muted" id="jsonHelp" style="margin:0">ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”</p>
     <textarea id="jsonText" spellcheck="false" aria-label="ข้อมูล JSON"></textarea>
     <div class="actions" style="margin:0">
-      <button class="btn primary" id="jsonLoad">โหลดจากข้อความนี้</button>
+      <button class="btn primary edit-only" id="jsonLoad">โหลดจากข้อความนี้</button>
       <button class="btn" id="jsonCopy">คัดลอก</button>
       <button class="btn" id="jsonSave">บันทึกเป็นไฟล์</button>
-      <label class="btn" for="jsonFile">เปิดไฟล์ .json…</label>
+      <label class="btn edit-only" for="jsonFile">เปิดไฟล์ .json…</label>
       <input type="file" id="jsonFile" accept=".json,application/json" hidden>
       <div class="spacer"></div>
       <button class="btn" data-close>ปิด</button>
@@ -293,12 +325,22 @@ button, input, select, textarea { font: inherit; color: inherit; }
     <h2 id="filesTitle">ผังที่บันทึกไว้บนเซิร์ฟเวอร์</h2>
     <div class="list" id="filesList"></div>
     <div class="actions" style="margin:0">
-      <button class="btn primary" id="filesNew">สร้างผังใหม่</button>
+      <button class="btn primary edit-only" id="filesNew">สร้างผังใหม่</button>
       <div class="spacer"></div>
       <button class="btn" data-close>ปิด</button>
     </div>
   </div>
 </div>
+
+<div class="overlay" id="usersModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="usersTitle" id="usersBody"></div>
+</div>
+
+<div class="overlay" id="pwModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pwTitle" style="width:min(420px,100%)" id="pwBody"></div>
+</div>
+
+<div class="auth" id="authScreen" hidden><div class="auth-card" id="authCard"></div></div>
 
 <div class="toast" id="toast" hidden></div>
 
@@ -493,6 +535,9 @@ let view = { x: 0, y: 0, k: 1 };
 let drag = null;
 let undoStack = [], redoStack = [];
 let server = false;
+let authOn = false;            // the server asks for a login
+let me = null;                 // signed-in account {id,email,name,role}
+let canEdit = true;            // false for read-only (viewer) accounts
 
 const $ = (s) => document.querySelector(s);
 const svg = $("#canvas"), world = $("#world"), inspector = $("#inspector");
@@ -585,9 +630,9 @@ function persist() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId })); } catch (e) {}
-    if (server && docId) {
+    if (server && docId && canEdit) {
       try {
-        const r = await fetch("api/diagrams/" + encodeURIComponent(docId), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) });
+        const r = await apiFetch("diagrams/" + encodeURIComponent(docId), { method: "PUT", body: doc });
         setPill(r.ok ? L("บันทึกบนเซิร์ฟเวอร์แล้ว", "Saved to server") : L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")", r.ok);
       } catch (e) { setPill(L("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server"), false); }
     }
@@ -601,10 +646,19 @@ function setPill(text, on) {
 async function detectServer() {
   try {
     const r = await fetch("api/health", { cache: "no-store" });
-    if (!r.ok) return false;
+    if (!r.ok) return null;
     const j = await r.json();
-    return j && j.app === "netplan";
-  } catch (e) { return false; }
+    return j && j.app === "netplan" ? j : null;
+  } catch (e) { return null; }
+}
+// Server API call: JSON body in, the anti-forgery header on writes, and back to the sign-in screen on 401.
+async function apiFetch(path, opts = {}) {
+  const o = { cache: "no-store", credentials: "same-origin", ...opts, headers: { ...(opts.headers || {}) } };
+  if (o.method && o.method !== "GET") o.headers["X-NetPlan"] = "1";
+  if (o.body !== undefined && typeof o.body !== "string") { o.body = JSON.stringify(o.body); o.headers["Content-Type"] = "application/json"; }
+  const r = await fetch("api/" + path, o);
+  if (r.status === 401 && authOn && !path.startsWith("auth/")) { me = null; showAuth("login", { th: "หมดเวลาการเข้าใช้งาน กรุณาเข้าสู่ระบบอีกครั้ง", en: "Your session ended. Please sign in again.", kind: "err" }); }
+  return r;
 }
 
 /* ---------- Geometry ---------- */
@@ -1094,6 +1148,8 @@ function setLang(l) {
   applyLang(); setMode(mode); renderInspector(); render();
   if (searchQ) runSearch();
   if (server) setPill(L("เชื่อมต่อเซิร์ฟเวอร์แล้ว", "Connected to server"), true); else setPill(L("บันทึกอัตโนมัติในเบราว์เซอร์นี้", "Autosaved in this browser"), false);
+  if (!$("#authScreen").hidden) renderAuth();
+  renderUserMenu();
 }
 for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLang(b.dataset.lang));
 function nextName(type) {
@@ -1104,6 +1160,7 @@ function nextName(type) {
   return `${base}-${String(i).padStart(2, "0")}`;
 }
 function addNode(type, x, y) {
+  if (!canEdit) return;
   checkpoint();
   const n = { id: uid("n"), type, x, y, name: nextName(type), ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [] };
   doc.nodes.push(n);
@@ -1157,7 +1214,7 @@ function renderInspector() {
   multi = new Set([...multi].filter(keyExists));
   if (sel) multi.clear();
   if (multi.size === 1) setSelection(multi);
-  if (multi.size >= 2) { inspector.innerHTML = multiPanel(); return; }
+  if (multi.size >= 2) { inspector.innerHTML = multiPanel(); lockInspector(); return; }
   let h = "";
   if (sel && sel.kind === "node") {
     const n = findNode(sel.id), t = TYPES[n.type];
@@ -1253,6 +1310,15 @@ function renderInspector() {
     </ul>`;
   }
   inspector.innerHTML = h;
+  lockInspector();
+}
+// Read-only accounts see the same panel with every control locked and the edit buttons removed.
+function lockInspector() {
+  if (canEdit) return;
+  for (const el of inspector.querySelectorAll("input,select,textarea")) {
+    if (el.tagName === "SELECT" || el.type === "color" || el.type === "checkbox") el.disabled = true; else el.readOnly = true;
+  }
+  for (const b of inspector.querySelectorAll("button")) if (!b.dataset.pick && !b.dataset.gotoLink) b.hidden = true;
 }
 
 let editSnapshot = null;
@@ -1262,6 +1328,7 @@ inspector.addEventListener("focusout", () => {
   editSnapshot = null;
 });
 inspector.addEventListener("input", (e) => {
+  if (!canEdit) return;
   const el = e.target;
   if (multi.size >= 2) {
     const objs = [...multi].map(keyExists);
@@ -1299,6 +1366,7 @@ inspector.addEventListener("input", (e) => {
 });
 inspector.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
+  if (!canEdit && !b.dataset.pick && !b.dataset.gotoLink) return;
   if (b.id === "delBtn") return deleteSelected();
   if (b.dataset.pick) { setSelection([b.dataset.pick]); const o = keyExists(b.dataset.pick); centerOn(b.dataset.pick[0] === "n" ? o : { x: o.x + o.w / 2, y: o.y + o.h / 2 }); render(); renderInspector(); return; }
   if (multi.size >= 2 && (b.dataset.swatch || b.dataset.colorReset != null)) {
@@ -1366,10 +1434,11 @@ const HINTS = {
   zone: "<b>วาดโซน</b> ลากบนพื้นที่ว่างเพื่อสร้างกรอบ DMZ, VLAN หรือห้อง/ชั้น",
 };
 function setMode(m) {
+  if (!canEdit) m = "select";
   mode = m; pendingFrom = null;
   for (const b of document.querySelectorAll("[data-mode]")) b.setAttribute("aria-pressed", String(b.dataset.mode === m));
   svg.setAttribute("class", "mode-" + m);
-  $("#hint").innerHTML = L(HINTS[m], HINTS_EN[m]);
+  $("#hint").innerHTML = canEdit ? L(HINTS[m], HINTS_EN[m]) : L("<b>ดูอย่างเดียว</b> คลิกอุปกรณ์ โซน หรือสายเพื่อดูรายละเอียด · ลากพื้นที่ว่างเพื่อเลื่อนผัง", "<b>View only</b> Click a device, zone or link to see its details · drag empty space to pan");
   render();
 }
 
@@ -1395,6 +1464,15 @@ svg.addEventListener("pointerdown", (e) => {
   const p = toWorld(e);
   const t = e.target.closest("[data-kind]");
   const kind = t?.dataset.kind, id = t?.dataset.id;
+  if (!canEdit) {
+    // view only: clicking shows details, dragging pans
+    multi = new Set();
+    if (kind === "node" || kind === "zone" || kind === "link") sel = { kind, id };
+    else if (kind !== "zone-resize") sel = null;
+    renderInspector();
+    drag = { type: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+    svg.setPointerCapture(e.pointerId); render(); return;
+  }
   const additive = mode === "select" && (e.shiftKey || e.ctrlKey || e.metaKey || multiMode);
   if (additive && (kind === "node" || kind === "zone")) {
     const ks = selectedKeys(), k = keyOf(kind, id);
@@ -1506,6 +1584,7 @@ svg.addEventListener("dblclick", (e) => {
 
 /* ---------- Keyboard ---------- */
 document.addEventListener("keydown", (e) => {
+  if (!$("#authScreen").hidden) return;
   // Letter shortcuts follow the physical key, so they also work while the keyboard is set to Thai.
   const k = /^Key[A-Z]$/.test(e.code || "") ? e.code.slice(3).toLowerCase() : (e.key || "").toLowerCase();
   if (((e.ctrlKey || e.metaKey) && k === "f") || (e.key === "/" && !e.target.matches("input,textarea,select"))) {
@@ -1513,6 +1592,7 @@ document.addEventListener("keydown", (e) => {
   }
   const typing = e.target.matches("input,textarea,select");
   const mod = e.ctrlKey || e.metaKey;
+  if (!canEdit && !typing && ((mod && "zyda".includes(k)) || e.key === "Delete" || e.key === "Backspace" || e.key.startsWith("Arrow") || k === "c" || k === "z")) return;
   if (mod && k === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && k === "y" && !typing) { e.preventDefault(); redo(); return; }
   if (mod && k === "d" && !typing) { e.preventDefault(); duplicate(); return; }
@@ -1571,6 +1651,7 @@ newBtn.addEventListener("click", async () => {
   await newDiagram();
 });
 async function newDiagram() {
+  if (!canEdit) return;
   if (server) { await createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] }); return; }
   checkpoint();
   doc = { version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] };
@@ -1709,8 +1790,9 @@ async function persistNewOrCurrent() {
 
 /* ---------- Server diagrams ---------- */
 async function createOnServer(d, keepDoc) {
+  if (!canEdit) return;
   try {
-    const r = await fetch("api/diagrams", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) });
+    const r = await apiFetch("diagrams", { method: "POST", body: d });
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
     if (!keepDoc) { checkpoint(); doc = normalize(d); sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView(); }
@@ -1723,9 +1805,9 @@ async function openFiles() {
   box.innerHTML = `<p class="muted">${L("กำลังโหลด…", "Loading…")}</p>`;
   openModal("#filesModal");
   try {
-    const list = await (await fetch("api/diagrams", { cache: "no-store" })).json();
+    const list = await (await apiFetch("diagrams")).json();
     if (!list.length) { box.innerHTML = `<p class="muted">${L("ยังไม่มีผังบนเซิร์ฟเวอร์", "No diagrams on the server yet")}</p>`; return; }
-    box.innerHTML = list.map((x) => `<div class="list-row${x.id === docId ? " current" : ""}"><div><b>${esc(x.title)}</b><small>${L("อุปกรณ์", "Devices")} ${x.nodes} · ${L("แก้ไขล่าสุด", "Last edited")} ${esc(new Date(x.updatedAt).toLocaleString(L("th-TH", "en-GB")))}${x.id === docId ? L(" · กำลังเปิดอยู่", " · open now") : ""}</small></div><button class="btn" data-open="${esc(x.id)}">${L("เปิด", "Open")}</button><button class="btn danger" data-del="${esc(x.id)}">${L("ลบ", "Delete")}</button></div>`).join("");
+    box.innerHTML = list.map((x) => `<div class="list-row${x.id === docId ? " current" : ""}"><div><b>${esc(x.title)}</b><small>${L("อุปกรณ์", "Devices")} ${x.nodes} · ${L("แก้ไขล่าสุด", "Last edited")} ${esc(new Date(x.updatedAt).toLocaleString(L("th-TH", "en-GB")))}${x.updatedBy ? L(" โดย ", " by ") + esc(x.updatedBy) : ""}${x.id === docId ? L(" · กำลังเปิดอยู่", " · open now") : ""}</small></div><button class="btn" data-open="${esc(x.id)}">${L("เปิด", "Open")}</button>${canEdit ? `<button class="btn danger" data-del="${esc(x.id)}">${L("ลบ", "Delete")}</button>` : "<span></span>"}</div>`).join("");
   } catch (e) { box.innerHTML = `<p class="muted">${L("โหลดรายการไม่ได้ ตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่", "Couldn't load the list. Check that the server is running.")}</p>`; }
 }
 $("#filesBtn").onclick = openFiles;
@@ -1734,14 +1816,14 @@ $("#filesList").addEventListener("click", async (e) => {
   const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
   if (o) {
     try {
-      const r = await fetch("api/diagrams/" + encodeURIComponent(o.dataset.open), { cache: "no-store" });
+      const r = await apiFetch("diagrams/" + encodeURIComponent(o.dataset.open));
       const j = normalize(await r.json());
       doc = j; docId = o.dataset.open; undoStack = []; redoStack = []; sel = null; afterDocSwap(); fit(); closeModals();
     } catch (err) { toast(L("เปิดผังไม่ได้", "Couldn't open the diagram")); }
   }
   if (d) {
     if (!d.classList.contains("armed")) { d.classList.add("armed"); d.textContent = L("ยืนยันลบ", "Confirm delete"); return; }
-    await fetch("api/diagrams/" + encodeURIComponent(d.dataset.del), { method: "DELETE" });
+    await apiFetch("diagrams/" + encodeURIComponent(d.dataset.del), { method: "DELETE" });
     if (d.dataset.del === docId) docId = null;
     openFiles();
   }
@@ -1840,6 +1922,236 @@ searchInput.addEventListener("keydown", (e) => {
 $("#searchRes").addEventListener("mousedown", (e) => e.preventDefault());
 $("#searchRes").addEventListener("click", (e) => { const b = e.target.closest("[data-res]"); if (b) chooseResult(+b.dataset.res); });
 
+/* ---------- Accounts ----------
+   Only when the server has login turned on: sign-in / sign-up / password reset screen,
+   the account menu, and the administrator's user and e-mail settings. */
+const roleLabel = (r) => ({ admin: L("ผู้ดูแลระบบ", "Admin"), editor: L("ผู้แก้ไข", "Editor"), viewer: L("ดูอย่างเดียว", "Viewer") }[r] || r);
+const roleHelp = () => L("ผู้ดูแลระบบ: ทำได้ทุกอย่างและจัดการผู้ใช้ · ผู้แก้ไข: เพิ่ม ลบ แก้ไขผังได้ · ดูอย่างเดียว: เปิดดูและส่งออกได้ แต่แก้ไขไม่ได้",
+  "Admin: everything, including managing users · Editor: add, delete and edit diagrams · Viewer: open and export only");
+const AUTH_ERRORS = {
+  bad_login: ["อีเมลหรือรหัสผ่านไม่ถูกต้อง", "Wrong e-mail or password."],
+  unverified: ["บัญชีนี้ยังไม่ได้ยืนยันอีเมล กรุณากดลิงก์ในอีเมลที่ส่งไปก่อน", "This account's e-mail is not verified yet. Please click the link we sent."],
+  too_many: ["ลองผิดหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่", "Too many attempts. Please wait 15 minutes."],
+  exists: ["อีเมลนี้มีบัญชีอยู่แล้ว ลองเข้าสู่ระบบ หรือกดลืมรหัสผ่าน", "This e-mail already has an account. Sign in or reset the password."],
+  bad_email: ["รูปแบบอีเมลไม่ถูกต้อง", "That e-mail address doesn't look right."],
+  bad_name: ["กรุณากรอกชื่อ", "Please enter your name."],
+  weak_password: ["รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร", "The password needs at least 8 characters."],
+  bad_token: ["ลิงก์นี้หมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่", "This link has expired or was already used. Please ask for a new one."],
+  bad_current: ["รหัสผ่านปัจจุบันไม่ถูกต้อง", "The current password is wrong."],
+  mismatch: ["รหัสผ่านสองช่องไม่ตรงกัน", "The two passwords don't match."],
+  last_admin: ["ต้องมีผู้ดูแลระบบอย่างน้อย 1 คน", "There must be at least one admin."],
+  self: ["ลบบัญชีของตัวเองไม่ได้", "You can't delete your own account."],
+  bad_url: ["ที่อยู่เว็บต้องขึ้นต้นด้วย http:// หรือ https://", "The address must start with http:// or https://"],
+  network: ["เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server."],
+};
+const errNote = (code) => { const m = AUTH_ERRORS[code] || [`เกิดข้อผิดพลาด (${code})`, `Something went wrong (${code})`]; return { th: m[0], en: m[1], kind: "err" }; };
+const noteHtml = (n) => (n ? `<div class="note ${n.kind || ""}" role="status">${esc(L(n.th, n.en))}</div>` : "");
+async function postJson(path, body) {
+  try {
+    const r = await apiFetch(path, { method: "POST", body });
+    let j = {}; try { j = await r.json(); } catch (e) {}
+    return { ok: r.ok, status: r.status, j };
+  } catch (e) { return { ok: false, status: 0, j: { error: "network" } }; }
+}
+
+let authView = { view: "login", note: null, email: "", token: "" };
+function showAuth(view, note, extra = {}) {
+  authView = { ...authView, view, note: note || null, ...extra };
+  $("#authScreen").hidden = false;
+  renderAuth();
+}
+function renderAuth() {
+  const { view, note, email } = authView;
+  const f = (id, label, type, ac, val = "") => `<div class="f"><label for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" autocomplete="${ac}" value="${esc(val)}" required${type === "password" ? ' minlength="8"' : ""}></div>`;
+  const langSeg = `<div class="grp seg" role="group" aria-label="ภาษา / Language"><button class="btn" type="button" data-alang="th" aria-pressed="${lang === "th"}">ไทย</button><button class="btn" type="button" data-alang="en" aria-pressed="${lang === "en"}">EN</button></div>`;
+  let h = `<div class="auth-top"><div class="brand">${$(".brand svg").outerHTML}NetPlan</div>${langSeg}</div>`;
+  if (view === "login") {
+    h += `<h1>${L("เข้าสู่ระบบ", "Sign in")}</h1>${noteHtml(note)}`;
+    if (note && note.resend) h += `<button class="btn" type="button" data-go="resend">${L("ส่งอีเมลยืนยันอีกครั้ง", "Send the verification e-mail again")}</button>`;
+    h += `<form data-form="login">${f("a_email", L("อีเมล", "E-mail"), "email", "username", email)}${f("a_pass", L("รหัสผ่าน", "Password"), "password", "current-password")}<button class="btn primary">${L("เข้าสู่ระบบ", "Sign in")}</button></form>`;
+    h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="forgot">${L("ลืมรหัสผ่าน", "Forgot password?")}</button><button class="linkbtn" type="button" data-go="register">${L("สมัครสมาชิก", "Create an account")}</button></div>`;
+  } else if (view === "register") {
+    h += `<h1>${L("สมัครสมาชิก", "Create an account")}</h1>`;
+    h += `<p class="muted">${authView.first ? L("ยังไม่มีผู้ใช้ในระบบ บัญชีแรกที่สมัครจะเป็นผู้ดูแลระบบ (admin) และใช้งานได้ทันที", "There are no users yet. The first account becomes the administrator and works right away.") : L("หลังสมัคร ระบบจะส่งลิงก์ยืนยันไปที่อีเมลของคุณ บัญชีใหม่จะดูผังได้อย่างเดียวจนกว่าผู้ดูแลระบบจะเพิ่มสิทธิ์", "We'll e-mail you a link to verify your address. New accounts can view only until an admin grants more rights.")}</p>${noteHtml(note)}`;
+    h += `<form data-form="register">${f("a_name", L("ชื่อ-นามสกุล", "Full name"), "text", "name")}${f("a_email", L("อีเมล", "E-mail"), "email", "email", email)}${f("a_pass", L("รหัสผ่าน (อย่างน้อย 8 ตัว)", "Password (8+ characters)"), "password", "new-password")}${f("a_pass2", L("ยืนยันรหัสผ่าน", "Confirm password"), "password", "new-password")}<button class="btn primary">${L("สมัครสมาชิก", "Create account")}</button></form>`;
+    h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="login">${L("มีบัญชีแล้ว? เข้าสู่ระบบ", "Have an account? Sign in")}</button></div>`;
+  } else if (view === "forgot") {
+    h += `<h1>${L("ลืมรหัสผ่าน", "Forgot password")}</h1><p class="muted">${L("กรอกอีเมลของบัญชี ระบบจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปให้", "Enter your account's e-mail and we'll send a link to set a new password.")}</p>${noteHtml(note)}`;
+    h += `<form data-form="forgot">${f("a_email", L("อีเมล", "E-mail"), "email", "username", email)}<button class="btn primary">${L("ส่งลิงก์", "Send link")}</button></form>`;
+    h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="login">${L("กลับไปหน้าเข้าสู่ระบบ", "Back to sign in")}</button></div>`;
+  } else if (view === "reset") {
+    h += `<h1>${L("ตั้งรหัสผ่านใหม่", "Set a new password")}</h1>${noteHtml(note)}`;
+    h += `<form data-form="reset">${f("a_pass", L("รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)", "New password (8+ characters)"), "password", "new-password")}${f("a_pass2", L("ยืนยันรหัสผ่านใหม่", "Confirm new password"), "password", "new-password")}<button class="btn primary">${L("บันทึกรหัสผ่าน", "Save password")}</button></form>`;
+    h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="login">${L("กลับไปหน้าเข้าสู่ระบบ", "Back to sign in")}</button></div>`;
+  } else {
+    h += `<h1>${L("ตรวจสอบอีเมลของคุณ", "Check your e-mail")}</h1>${noteHtml(note)}<button class="btn primary" type="button" data-go="login">${L("ไปหน้าเข้าสู่ระบบ", "Go to sign in")}</button>`;
+  }
+  $("#authCard").innerHTML = h;
+  const first = $("#authCard input");
+  if (first && !first.value) first.focus(); else if (first) $("#authCard input[type=password]")?.focus();
+}
+$("#authCard").addEventListener("click", async (e) => {
+  const lb = e.target.closest("[data-alang]");
+  if (lb) { setLang(lb.dataset.alang); return; }
+  const g = e.target.closest("[data-go]"); if (!g) return;
+  const email = $("#a_email")?.value.trim() || authView.email;
+  if (g.dataset.go === "resend") {
+    const r = await postJson("auth/resend", { email });
+    showAuth("login", r.ok ? (r.j.mailReady ? { th: "ส่งอีเมลยืนยันใหม่แล้ว กรุณาตรวจสอบกล่องจดหมาย (และโฟลเดอร์สแปม)", en: "We sent a new verification e-mail. Check your inbox (and spam folder).", kind: "ok" } : { th: "ระบบยังไม่ได้ตั้งค่าการส่งอีเมล กรุณาติดต่อผู้ดูแลระบบให้ยืนยันบัญชีให้", en: "E-mail sending isn't set up yet. Please ask an admin to verify your account.", kind: "err" }) : errNote(r.j.error), { email });
+    return;
+  }
+  showAuth(g.dataset.go, null, { email });
+});
+$("#authCard").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target, kind = form.dataset.form, v = (id) => ($("#" + id)?.value || "");
+  const btn = form.querySelector("button.primary"); btn.disabled = true;
+  const email = v("a_email").trim();
+  try {
+    if ((kind === "register" || kind === "reset") && v("a_pass") !== v("a_pass2")) return showAuth(kind, errNote("mismatch"), { email });
+    if (kind === "login") {
+      const r = await postJson("auth/login", { email, password: v("a_pass") });
+      if (r.ok) { location.replace(location.pathname); return; }
+      const n = errNote(r.j.error); if (r.j.error === "unverified") n.resend = true;
+      return showAuth("login", n, { email });
+    }
+    if (kind === "register") {
+      const r = await postJson("auth/register", { name: v("a_name").trim(), email, password: v("a_pass") });
+      if (!r.ok) return showAuth("register", errNote(r.j.error), { email });
+      if (r.j.first) {
+        const l = await postJson("auth/login", { email, password: v("a_pass") });
+        if (l.ok) { location.replace(location.pathname); return; }
+      }
+      return showAuth("done", r.j.mailed
+        ? { th: `เราส่งลิงก์ยืนยันไปที่ ${email} แล้ว กดลิงก์ในอีเมลเพื่อเปิดใช้บัญชี (ถ้าไม่เห็น ลองดูในโฟลเดอร์สแปม)`, en: `We sent a verification link to ${email}. Click it to activate your account (check the spam folder too).`, kind: "ok" }
+        : { th: "สมัครเรียบร้อย แต่ระบบยังส่งอีเมลไม่ได้ กรุณาติดต่อผู้ดูแลระบบให้ยืนยันบัญชีให้", en: "You're signed up, but e-mail sending isn't working yet. Please ask an admin to verify your account.", kind: "err" }, { email });
+    }
+    if (kind === "forgot") {
+      const r = await postJson("auth/forgot", { email });
+      if (!r.ok) return showAuth("forgot", errNote(r.j.error), { email });
+      return showAuth("done", r.j.mailReady
+        ? { th: `ถ้ามีบัญชีของ ${email} ในระบบ เราได้ส่งลิงก์ตั้งรหัสผ่านใหม่ไปแล้ว ลิงก์ใช้ได้ 1 ชั่วโมง`, en: `If ${email} has an account, we've sent a reset link. It works for 1 hour.`, kind: "ok" }
+        : { th: "ระบบยังไม่ได้ตั้งค่าการส่งอีเมล กรุณาติดต่อผู้ดูแลระบบ", en: "E-mail sending isn't set up yet. Please contact an admin.", kind: "err" }, { email });
+    }
+    if (kind === "reset") {
+      const r = await postJson("auth/reset", { token: authView.token, password: v("a_pass") });
+      if (!r.ok) return showAuth("reset", errNote(r.j.error));
+      return showAuth("login", { th: "ตั้งรหัสผ่านใหม่แล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย", en: "Password changed. Sign in with the new one.", kind: "ok" });
+    }
+  } finally { if (btn.isConnected) btn.disabled = false; }
+});
+
+function renderUserMenu() {
+  if (!me) { $("#userMenu").hidden = true; return; }
+  $("#userMenu").hidden = false;
+  $("#userInitial").textContent = (me.name || me.email).trim().charAt(0).toUpperCase();
+  $("#userName").textContent = me.name || me.email;
+  $("#userMenuBody").innerHTML = `<div class="who"><b>${esc(me.name)}</b><small>${esc(me.email)}</small><span class="role ${me.role}">${esc(roleLabel(me.role))}</span></div>`
+    + (me.role === "admin" ? `<button class="btn" data-um="users">${L("จัดการผู้ใช้และอีเมล", "Users & e-mail settings")}</button>` : "")
+    + `<button class="btn" data-um="password">${L("เปลี่ยนรหัสผ่าน", "Change password")}</button><button class="btn" data-um="logout">${L("ออกจากระบบ", "Sign out")}</button>`;
+}
+function applyRole() {
+  canEdit = !me || me.role === "admin" || me.role === "editor";
+  document.body.classList.toggle("readonly", !canEdit);
+  $("#docTitle").readOnly = !canEdit;
+  renderUserMenu(); setMode("select"); renderInspector();
+}
+$("#userMenuBody").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-um]"); if (!b) return;
+  $("#userMenu").open = false;
+  if (b.dataset.um === "logout") {
+    await postJson("auth/logout", {});
+    try { localStorage.removeItem(LS_KEY); } catch (err) {}
+    location.replace(location.pathname); return;
+  }
+  if (b.dataset.um === "password") return openPassword();
+  if (b.dataset.um === "users") return openUsers();
+});
+document.addEventListener("click", (e) => { if (!e.target.closest("#userMenu")) $("#userMenu").open = false; });
+
+function openPassword(note) {
+  const f = (id, label, ac) => `<div class="f"><label for="${id}">${label}</label><input id="${id}" type="password" autocomplete="${ac}" minlength="8" required></div>`;
+  $("#pwBody").innerHTML = `<h2 id="pwTitle">${L("เปลี่ยนรหัสผ่าน", "Change password")}</h2>${noteHtml(note)}<form id="pwForm" style="display:grid;gap:10px">${f("pw_cur", L("รหัสผ่านปัจจุบัน", "Current password"), "current-password")}${f("pw_new", L("รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)", "New password (8+ characters)"), "new-password")}${f("pw_new2", L("ยืนยันรหัสผ่านใหม่", "Confirm new password"), "new-password")}<div class="actions" style="margin:0"><button class="btn primary">${L("บันทึก", "Save")}</button><div class="spacer"></div><button class="btn" type="button" data-close>${L("ปิด", "Close")}</button></div></form>`;
+  openModal("#pwModal"); $("#pw_cur").focus();
+}
+$("#pwBody").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if ($("#pw_new").value !== $("#pw_new2").value) return openPassword(errNote("mismatch"));
+  const r = await postJson("me/password", { current: $("#pw_cur").value, password: $("#pw_new").value });
+  if (!r.ok) return openPassword(errNote(r.j.error));
+  closeModals(); toast(L("เปลี่ยนรหัสผ่านแล้ว", "Password changed"));
+});
+
+let usersNote = null;
+async function openUsers() {
+  openModal("#usersModal");
+  const box = $("#usersBody");
+  box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2><p class="muted">${L("กำลังโหลด…", "Loading…")}</p>`;
+  let list, cfg;
+  try {
+    const [a, b] = await Promise.all([apiFetch("users"), apiFetch("settings")]);
+    if (!a.ok || !b.ok) throw new Error();
+    list = await a.json(); cfg = await b.json();
+  } catch (err) { box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(errNote("network"))}<div class="actions"><div class="spacer"></div><button class="btn" data-close>${L("ปิด", "Close")}</button></div>`; return; }
+  const roleSel = (u) => `<select class="sel-sm" data-urole="${esc(u.id)}" aria-label="${L("สิทธิ์ของ", "Role of")} ${esc(u.name)}">${["admin", "editor", "viewer"].map((r) => `<option value="${r}"${u.role === r ? " selected" : ""}>${esc(roleLabel(r))}</option>`).join("")}</select>`;
+  const rows = list.map((u) => `<div class="user-row"><div><b>${esc(u.name)}${u.id === me.id ? L(" (คุณ)", " (you)") : ""}</b><small>${esc(u.email)} · ${u.verified ? L("ยืนยันอีเมลแล้ว", "verified") : L("รอยืนยันอีเมล", "waiting for e-mail verification")}${u.lastLogin ? " · " + L("เข้าล่าสุด ", "last sign-in ") + esc(new Date(u.lastLogin).toLocaleString(L("th-TH", "en-GB"))) : ""}</small></div>`
+    + `<div class="grp">${roleSel(u)}${u.verified ? "" : `<button class="btn" data-uverify="${esc(u.id)}">${L("ยืนยันให้", "Verify")}</button>`}</div>`
+    + (u.id === me.id ? "<span></span>" : `<button class="btn danger" data-udel="${esc(u.id)}">${L("ลบ", "Delete")}</button>`) + `</div>`).join("");
+  const s = cfg.smtp;
+  const inp = (id, label, val, o = {}) => `<div class="f${o.full ? " full" : ""}"><label for="${id}">${label}</label><input id="${id}" type="${o.type || "text"}" value="${esc(val ?? "")}" placeholder="${esc(o.ph || "")}" autocomplete="off"${o.mono ? ' class="mono"' : ""}></div>`;
+  box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(usersNote)}<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${roleHelp()}</p><div class="list">${rows}</div>`
+    + `<div class="sec">${L("การส่งอีเมล (SMTP)", "E-mail sending (SMTP)")}</div>`
+    + `<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${cfg.mailReady ? L("ตั้งค่าแล้ว ระบบจะส่งลิงก์ยืนยันและลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล", "Set up. Verification and password links are sent by e-mail.") : L("ยังไม่ได้ตั้งค่า ระหว่างนี้ลิงก์ยืนยันจะแสดงใน log ของเซิร์ฟเวอร์ (docker compose logs) หรือกด “ยืนยันให้” ที่รายชื่อด้านบน", "Not set up. Until then, links appear in the server log (docker compose logs), or press “Verify” in the list above.")}</p>`
+    + `<form id="smtpForm"><div class="fields">${inp("s_host", L("เซิร์ฟเวอร์ SMTP", "SMTP server"), s.host, { ph: "smtp.gmail.com" })}${inp("s_port", L("พอร์ต", "Port"), s.port, { ph: "587", type: "number" })}`
+    + `${inp("s_user", L("ชื่อผู้ใช้", "Username"), s.user, { ph: "you@example.com" })}${inp("s_pass", L("รหัสผ่าน / App password", "Password / app password"), "", { type: "password", ph: s.hasPass ? L("บันทึกไว้แล้ว (เว้นว่างถ้าไม่เปลี่ยน)", "saved (leave blank to keep)") : "" })}`
+    + `${inp("s_from", L("ผู้ส่ง (From)", "Sender (From)"), s.from, { ph: "NetPlan <you@example.com>", full: true })}`
+    + `<label class="check" style="grid-column:1/-1"><input type="checkbox" id="s_secure"${s.secure ? " checked" : ""}> ${L("ใช้ SSL/TLS ตั้งแต่เริ่มเชื่อมต่อ (พอร์ต 465) ถ้าไม่เลือกจะใช้ STARTTLS (พอร์ต 587)", "Use SSL/TLS from the start (port 465). Otherwise STARTTLS (port 587) is used.")}</label>`
+    + `${inp("s_url", L("ที่อยู่เว็บที่ใส่ในลิงก์อีเมล", "Web address used in e-mail links"), cfg.appUrl, { ph: "http://192.168.1.10:8088", full: true, mono: true })}</div>`
+    + `<div class="actions"><button class="btn primary">${L("บันทึกการตั้งค่า", "Save settings")}</button><button class="btn" type="button" id="smtpTest">${L("ส่งอีเมลทดสอบถึงตัวเอง", "Send me a test e-mail")}</button><div class="spacer"></div><button class="btn" type="button" data-close>${L("ปิด", "Close")}</button></div></form>`;
+  usersNote = null;
+}
+async function userCall(path, method, body) {
+  try {
+    const r = await apiFetch(path, { method, body });
+    if (!r.ok) { let j = {}; try { j = await r.json(); } catch (e) {} usersNote = errNote(j.error || r.status); }
+    return r.ok;
+  } catch (e) { usersNote = errNote("network"); return false; }
+}
+$("#usersBody").addEventListener("change", async (e) => {
+  const sel = e.target.closest("[data-urole]"); if (!sel) return;
+  if (await userCall("users/" + sel.dataset.urole, "PATCH", { role: sel.value })) {
+    usersNote = { th: "เปลี่ยนสิทธิ์แล้ว", en: "Role changed", kind: "ok" };
+    if (sel.dataset.urole === me.id) { me.role = sel.value; applyRole(); if (me.role !== "admin") { closeModals(); return; } }
+  }
+  openUsers();
+});
+$("#usersBody").addEventListener("click", async (e) => {
+  const v = e.target.closest("[data-uverify]"), d = e.target.closest("[data-udel]");
+  if (v) { if (await userCall("users/" + v.dataset.uverify, "PATCH", { verified: true })) usersNote = { th: "ยืนยันบัญชีแล้ว", en: "Account verified", kind: "ok" }; openUsers(); return; }
+  if (d) {
+    if (!d.classList.contains("armed")) { d.classList.add("armed"); d.textContent = L("ยืนยันลบ", "Confirm delete"); return; }
+    if (await userCall("users/" + d.dataset.udel, "DELETE")) usersNote = { th: "ลบผู้ใช้แล้ว", en: "User deleted", kind: "ok" };
+    openUsers(); return;
+  }
+  if (e.target.closest("#smtpTest")) {
+    const b = e.target.closest("#smtpTest"); b.disabled = true; b.textContent = L("กำลังส่ง…", "Sending…");
+    await saveSmtp(true);
+    const r = await postJson("settings/test", {});
+    usersNote = r.ok ? { th: `ส่งอีเมลทดสอบไปที่ ${me.email} แล้ว`, en: `Test e-mail sent to ${me.email}`, kind: "ok" }
+      : { th: "ส่งไม่สำเร็จ: " + (r.j.detail || r.j.error || r.status), en: "Sending failed: " + (r.j.detail || r.j.error || r.status), kind: "err" };
+    openUsers();
+  }
+});
+async function saveSmtp(quiet) {
+  const ok = await userCall("settings", "PUT", {
+    appUrl: $("#s_url").value.trim(),
+    smtp: { host: $("#s_host").value.trim(), port: $("#s_port").value.trim(), user: $("#s_user").value.trim(), pass: $("#s_pass").value, from: $("#s_from").value.trim(), secure: $("#s_secure").checked },
+  });
+  if (ok && !quiet) usersNote = { th: "บันทึกการตั้งค่าแล้ว", en: "Settings saved", kind: "ok" };
+  return ok;
+}
+$("#usersBody").addEventListener("submit", async (e) => { e.preventDefault(); await saveSmtp(false); openUsers(); });
+
 /* ---------- Boot ---------- */
 function boot() {
   let saved = null;
@@ -1849,19 +2161,38 @@ function boot() {
   applyLang(); bindPalette(); setMode("select"); renderInspector(); updateUndoButtons();
   requestAnimationFrame(fit);
   window.addEventListener("resize", () => { if (!doc.nodes.length) return; });
-  detectServer().then(async (ok) => {
-    server = ok;
-    if (!ok) { setPill(L("บันทึกอัตโนมัติในเบราว์เซอร์นี้", "Autosaved in this browser"), false); return; }
+  const params = new URLSearchParams(location.search);
+  if (params.has("verified") || params.has("reset")) history.replaceState(null, "", location.pathname);
+  detectServer().then(async (health) => {
+    server = !!health;
+    if (!server) { setPill(L("บันทึกอัตโนมัติในเบราว์เซอร์นี้", "Autosaved in this browser"), false); return; }
+    authOn = !!health.auth;
+    if (authOn) {
+      if (params.get("reset")) return showAuth("reset", null, { token: params.get("reset") });
+      const verified = params.get("verified");
+      const vNote = verified === "1" ? { th: "ยืนยันอีเมลเรียบร้อย เข้าสู่ระบบได้เลย", en: "E-mail verified. You can sign in now.", kind: "ok" }
+        : verified === "0" ? errNote("bad_token") : null;
+      let r;
+      try { r = await apiFetch("me"); } catch (e) { setPill(L("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server"), false); return; }
+      if (r.status === 401) {
+        const j = await r.json().catch(() => ({}));
+        if (j.hasUsers === false) return showAuth("register", null, { first: true });
+        return showAuth("login", vNote);
+      }
+      me = await r.json();
+      applyRole();
+      if (vNote) toast(L(vNote.th, vNote.en));
+    }
     $("#filesBtn").hidden = false;
     setPill(L("เชื่อมต่อเซิร์ฟเวอร์แล้ว", "Connected to server"), true);
     try {
       if (docId) {
-        const r = await fetch("api/diagrams/" + encodeURIComponent(docId), { cache: "no-store" });
+        const r = await apiFetch("diagrams/" + encodeURIComponent(docId));
         if (r.ok) { doc = normalize(await r.json()); afterDocSwap(); fit(); return; }
       }
-      const list = await (await fetch("api/diagrams", { cache: "no-store" })).json();
+      const list = await (await apiFetch("diagrams")).json();
       if (list.length) {
-        const r = await fetch("api/diagrams/" + encodeURIComponent(list[0].id), { cache: "no-store" });
+        const r = await apiFetch("diagrams/" + encodeURIComponent(list[0].id));
         doc = normalize(await r.json()); docId = list[0].id; afterDocSwap(); fit();
       } else {
         await createOnServer(doc, true);
