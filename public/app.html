@@ -264,6 +264,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
         <span id="zoomVal">100%</span>
         <button class="btn" id="zoomIn" title="ซูมเข้า" aria-label="ซูมเข้า">+</button>
         <button class="btn" id="zoomFit" title="พอดีจอ">พอดีจอ</button>
+        <button class="btn" id="multiBtn" aria-pressed="false" title="เลือกหลายชิ้น">เลือกหลายชิ้น</button>
       </div>
     </section>
     <aside class="inspector" id="inspector" aria-label="รายละเอียด"></aside>
@@ -484,6 +485,8 @@ const LS_KEY = "netplan.v1";
 let doc = null;
 let docId = null;            // server id when running with backend
 let sel = null;              // {kind:'node'|'link'|'zone', id}
+let multi = new Set();       // two or more picked devices/zones as "n:<id>" / "z:<id>"; empty when sel is set
+let multiMode = false;       // touch-friendly toggle: taps add to the selection, dragging empty space draws a box
 let mode = "select";
 let pendingFrom = null;
 let view = { x: 0, y: 0, k: 1 };
@@ -499,6 +502,19 @@ const snap = (v) => Math.round(v / 10) * 10;
 const findNode = (id) => doc.nodes.find((n) => n.id === id);
 const findLink = (id) => doc.links.find((l) => l.id === id);
 const findZone = (id) => doc.zones.find((z) => z.id === id);
+const keyOf = (kind, id) => (kind === "node" ? "n:" : "z:") + id;
+const keyExists = (k) => (k[0] === "n" ? findNode(k.slice(2)) : findZone(k.slice(2)));
+const isPicked = (kind, id) => (sel ? sel.kind === kind && sel.id === id : multi.has(keyOf(kind, id)));
+function selectedKeys() {
+  if (sel && (sel.kind === "node" || sel.kind === "zone")) return new Set([keyOf(sel.kind, sel.id)]);
+  return new Set(multi);
+}
+// Two or more items become a multi-selection; one becomes the ordinary single selection.
+function setSelection(keys) {
+  const ks = [...keys].filter(keyExists);
+  if (ks.length >= 2) { multi = new Set(ks); sel = null; }
+  else { multi = new Set(); sel = ks.length ? { kind: ks[0][0] === "n" ? "node" : "zone", id: ks[0].slice(2) } : null; }
+}
 // A link end is either a device or a zone.
 const endName = (id) => { const n = findNode(id); if (n) return n.name || TYPES[n.type].label; const z = findZone(id); return z ? z.name || L("โซน", "Zone") : "?"; };
 const endCenter = (id) => { const n = findNode(id); if (n) return { x: n.x, y: n.y }; const z = findZone(id); return z ? { x: z.x + z.w / 2, y: z.y + z.h / 2 } : null; };
@@ -829,13 +845,13 @@ function diagramMarkup(opts = {}) {
   // zones
   for (const z of doc.zones) {
     const c = zoneColor(z);
-    const isSel = !exp && sel && sel.kind === "zone" && sel.id === z.id;
+    const isSel = !exp && isPicked("zone", z.id);
     const isPend = !exp && pendingFrom === z.id;
     out += `<g data-kind="zone" data-id="${z.id}"${hits && !hits.has(z.id) ? ' opacity=".35"' : ""}>`;
     out += `<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="12" fill="${c}" fill-opacity="${isPend ? ".16" : ".07"}" stroke="${isPend ? "var(--sel)" : c}" stroke-opacity=".75" stroke-width="${isSel || isPend ? 2.5 : 1.5}" stroke-dasharray="7 5" style="cursor:${mode === "connect" ? "crosshair" : "move"}"/>`;
     out += `<text class="zlabel" x="${z.x + 12}" y="${z.y + 22}" fill="${c}" style="cursor:move">${esc(z.name || L("โซน", "Zone"))}</text>`;
     out += `</g>`;
-    if (isSel) out += `<rect data-kind="zone-resize" data-id="${z.id}" x="${z.x + z.w - 9}" y="${z.y + z.h - 9}" width="16" height="16" rx="3" fill="var(--panel)" stroke="${c}" stroke-width="2" style="cursor:nwse-resize"/>`;
+    if (isSel && sel) out += `<rect data-kind="zone-resize" data-id="${z.id}" x="${z.x + z.w - 9}" y="${z.y + z.h - 9}" width="16" height="16" rx="3" fill="var(--panel)" stroke="${c}" stroke-width="2" style="cursor:nwse-resize"/>`;
   }
   // links
   const pairs = {}, used = { h: new Map(), v: new Map() };
@@ -899,7 +915,7 @@ function diagramMarkup(opts = {}) {
   // nodes
   for (const n of doc.nodes) {
     const c = nodeColor(n);
-    const isSel = !exp && sel && sel.kind === "node" && sel.id === n.id;
+    const isSel = !exp && isPicked("node", n.id);
     const isPend = !exp && pendingFrom === n.id;
     const planned = n.status === "planned";
     const op = hits && !hits.has(n.id) ? 0.18 : planned ? 0.7 : 1;
@@ -925,6 +941,10 @@ function render() {
     if (drag && drag.type === "link") {
       const a = endCenter(drag.from);
       temp = `<line x1="${a.x}" y1="${a.y}" x2="${drag.cx}" y2="${drag.cy}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>`;
+    }
+    if (drag && drag.type === "marquee") {
+      const r = normRect(drag);
+      temp = `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="var(--accent)" fill-opacity=".08" stroke="var(--accent)" stroke-width="${1.5 / view.k}" stroke-dasharray="${5 / view.k} ${4 / view.k}" pointer-events="none"/>`;
     }
     if (drag && drag.type === "newzone") {
       const r = normRect(drag);
@@ -997,6 +1017,7 @@ const STATIC_TEXT = [
   ["#zoomOut", "title", "ซูมออก", "Zoom out"], ["#zoomOut", "aria-label", "ซูมออก", "Zoom out"],
   ["#zoomIn", "title", "ซูมเข้า", "Zoom in"], ["#zoomIn", "aria-label", "ซูมเข้า", "Zoom in"],
   ["#zoomFit", "text", "พอดีจอ", "Fit"], ["#zoomFit", "title", "พอดีจอ", "Fit to screen"],
+  ["#multiBtn", "text", "เลือกหลายชิ้น", "Multi-select"], ["#multiBtn", "title", "แตะเพื่อเพิ่มทีละชิ้น หรือลากกรอบบนพื้นที่ว่าง (เหมือนกด Shift ค้างไว้)", "Tap to add items one by one, or drag a box on empty space (same as holding Shift)"],
   ["#inspector", "aria-label", "รายละเอียด", "Details"],
   ["#jsonTitle", "text", "เปิด / บันทึกผังเป็น JSON", "Open / save the diagram as JSON"],
   ["#jsonHelp", "text", "ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”", "Below is the current diagram as JSON. Copy it to keep a copy, or paste saved JSON and press “Load this text”."],
@@ -1062,12 +1083,12 @@ function field(label, key, val, o = {}) {
 }
 const SWATCHES = ["#2f7a4c", "#1b7a8c", "#3a5a99", "#3b62c9", "#7a4fb8", "#b0418f", "#c2462b", "#d97706", "#c98a0b", "#7d8b1f", "#5a6472", "#2b2f36", "#0e9f6e", "#0891b2", "#e11d48", "#a16207"];
 // Full-range color picker (any of 16.7M colors) with a hex box, quick swatches and, for devices, a reset to the type color.
-function colorField(cur, custom) {
+function colorField(cur, custom, showReset = sel && sel.kind === "node") {
   let h = `<div class="f full"><label for="f_color">${L("สี", "Color")}</label><div class="colorrow">`;
   h += `<input type="color" id="f_color" data-color value="${cur}" aria-label="${L("เลือกสี", "Pick a color")}">`;
   h += `<input id="f_colorhex" class="mono hexbox" data-colorhex value="${cur}" maxlength="7" aria-label="${L("รหัสสี", "Hex color")}" spellcheck="false" autocomplete="off">`;
   h += `</div><div class="swatches">${SWATCHES.map((c) => `<button class="sw" data-swatch="${c}" style="background:${c}" title="${c}" aria-label="${L("สี", "Color")} ${c}"></button>`).join("")}</div>`;
-  if (sel.kind === "node") h += `<button class="btn" data-color-reset style="justify-self:start;margin-top:6px"${custom ? "" : " disabled"}>${L("ใช้สีตามชนิดอุปกรณ์", "Use the device type color")}</button>`;
+  if (showReset) h += `<button class="btn" data-color-reset style="justify-self:start;margin-top:6px"${custom ? "" : " disabled"}>${L("ใช้สีตามชนิดอุปกรณ์", "Use the device type color")}</button>`;
   return h + `</div>`;
 }
 const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
@@ -1077,7 +1098,25 @@ function linkRow(l, selfId) {
   const myPort = mine ? l.fromPort : l.toPort, otherPort = mine ? l.toPort : l.fromPort;
   return `<button class="btn" data-goto-link="${l.id}" style="justify-content:space-between;width:100%;white-space:normal;text-align:left;gap:10px"><span>${esc(myPort || "—")} → ${esc(endName(mine ? l.to : l.from))}${otherPort ? " (" + esc(otherPort) + ")" : ""}</span><span class="muted">${esc(LINKS[l.kind].label)}</span></button>`;
 }
+function multiPanel() {
+  const keys = [...multi], nodes = keys.filter((k) => k[0] === "n").map((k) => findNode(k.slice(2))), zones = keys.filter((k) => k[0] === "z").map((k) => findZone(k.slice(2)));
+  const first = nodes[0] ? nodeColor(nodes[0]) : zoneColor(zones[0]);
+  const parts = [nodes.length ? `${L("อุปกรณ์", "devices")} ${nodes.length}` : "", zones.length ? `${L("โซน", "zones")} ${zones.length}` : ""].filter(Boolean).join(" · ");
+  let h = `<div class="insp-head"><span class="tile" style="background:var(--accent);color:var(--accent-fg);font-weight:700">${keys.length}</span><div><h2>${L(`เลือกไว้ ${keys.length} ชิ้น`, `${keys.length} selected`)}</h2><small>${parts}</small></div></div>`;
+  h += `<div class="fields">${colorField(first, nodes.some((n) => n.color), nodes.length > 0)}`;
+  if (nodes.length) {
+    h += `<div class="f full"><label for="f_mstatus">${L("สถานะอุปกรณ์ทั้งหมด", "Status of all devices")}</label><select id="f_mstatus" data-mstatus><option value="">${L("— คงเดิม —", "— leave as is —")}</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("")}</select></div>`;
+  }
+  h += `</div><p class="muted" style="font-size:12.5px;line-height:1.55">${L("ลากชิ้นใดก็ได้ในกลุ่มเพื่อย้ายทั้งหมด · ปุ่มลูกศรเลื่อนทั้งกลุ่ม · Shift+คลิกเพื่อเพิ่มหรือเอาออก · Esc เพื่อยกเลิกการเลือก", "Drag any picked item to move them all · arrow keys nudge the group · Shift+click adds or removes · Esc clears")}</p>`;
+  h += `<div class="list">${keys.map((k) => { const o = keyExists(k); return `<button class="btn" data-pick="${k}" style="justify-content:flex-start;width:100%;white-space:normal;text-align:left">${esc(k[0] === "n" ? o.name || TYPES[o.type].label : o.name || L("โซน", "Zone"))}<span class="muted" style="margin-left:auto">${esc(k[0] === "n" ? TYPES[o.type].label : L("โซน", "Zone"))}</span></button>`; }).join("")}</div>`;
+  h += `<div class="actions"><button class="btn danger" id="delBtn">${L(`ลบทั้ง ${keys.length} ชิ้น`, `Delete all ${keys.length}`)}</button></div>`;
+  return h;
+}
 function renderInspector() {
+  multi = new Set([...multi].filter(keyExists));
+  if (sel) multi.clear();
+  if (multi.size === 1) setSelection(multi);
+  if (multi.size >= 2) { inspector.innerHTML = multiPanel(); return; }
   let h = "";
   if (sel && sel.kind === "node") {
     const n = findNode(sel.id), t = TYPES[n.type];
@@ -1161,12 +1200,14 @@ function renderInspector() {
       <li><b>เชื่อมสาย</b> กดโหมด “เชื่อมสาย” (C) แล้วลากจากอุปกรณ์หรือโซนหนึ่งไปอีกอันหนึ่ง หรือคลิกทีละตัว</li>
       <li><b>โซน / VLAN</b> กด “วาดโซน” (Z) แล้วลากเป็นกรอบ</li>
       <li><b>เลื่อนผัง</b> ลากพื้นที่ว่าง · <b>ซูม</b> ล้อเมาส์</li>
+      <li><b>เลือกหลายชิ้น</b> Shift+คลิก, Shift+ลากกรอบ หรือ Ctrl+A แล้วลากย้ายหรือเปลี่ยนสีพร้อมกัน</li>
       <li><b>ลบ</b> Delete · <b>ย้อน</b> Ctrl+Z · <b>สำเนา</b> Ctrl+D · <b>ค้นหา</b> Ctrl+F</li>`, `
       <li><b>Add a device</b> click or drag it from the left panel</li>
       <li><b>Add details</b> click a device and fill in this panel</li>
       <li><b>Connect</b> press “Connect” (C) and drag from one device or zone to another, or click one then the other</li>
       <li><b>Zone / VLAN</b> press “Draw zone” (Z) and drag a box</li>
       <li><b>Pan</b> drag empty space · <b>Zoom</b> mouse wheel</li>
+      <li><b>Pick several</b> Shift+click, Shift+drag a box or Ctrl+A, then move or recolor them together</li>
       <li><b>Delete</b> Delete · <b>Undo</b> Ctrl+Z · <b>Duplicate</b> Ctrl+D · <b>Search</b> Ctrl+F</li>`)}
     </ul>`;
   }
@@ -1181,6 +1222,19 @@ inspector.addEventListener("focusout", () => {
 });
 inspector.addEventListener("input", (e) => {
   const el = e.target;
+  if (multi.size >= 2) {
+    const objs = [...multi].map(keyExists);
+    if (el.dataset.color != null || el.dataset.colorhex != null) {
+      const v = el.value.trim();
+      if (!HEX_RE.test(v)) return;
+      for (const o of objs) o.color = v.toLowerCase();
+      const other = inspector.querySelector(el.dataset.color != null ? "#f_colorhex" : "#f_color");
+      if (other) other.value = v.toLowerCase();
+    } else if (el.dataset.mstatus != null && el.value) {
+      for (const k of multi) if (k[0] === "n") findNode(k.slice(2)).status = el.value;
+    }
+    render(); persist(); return;
+  }
   const obj = sel && (sel.kind === "node" ? findNode(sel.id) : sel.kind === "link" ? findLink(sel.id) : findZone(sel.id));
   if (!obj) return;
   if (el.dataset.field) {
@@ -1205,6 +1259,12 @@ inspector.addEventListener("input", (e) => {
 inspector.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.id === "delBtn") return deleteSelected();
+  if (b.dataset.pick) { setSelection([b.dataset.pick]); const o = keyExists(b.dataset.pick); centerOn(b.dataset.pick[0] === "n" ? o : { x: o.x + o.w / 2, y: o.y + o.h / 2 }); render(); renderInspector(); return; }
+  if (multi.size >= 2 && (b.dataset.swatch || b.dataset.colorReset != null)) {
+    checkpoint();
+    for (const k of multi) { const o = keyExists(k); if (b.dataset.swatch) o.color = b.dataset.swatch; else if (k[0] === "n") delete o.color; }
+    render(); renderInspector(); persist(); return;
+  }
   if (b.dataset.swatch || b.dataset.colorReset != null) {
     const obj = sel.kind === "node" ? findNode(sel.id) : findZone(sel.id);
     checkpoint();
@@ -1221,6 +1281,14 @@ inspector.addEventListener("click", (e) => {
 
 /* ---------- Actions ---------- */
 function deleteSelected() {
+  if (multi.size >= 2) {
+    checkpoint();
+    const ids = new Set([...multi].map((k) => k.slice(2)));
+    doc.nodes = doc.nodes.filter((n) => !ids.has(n.id));
+    doc.zones = doc.zones.filter((z) => !ids.has(z.id));
+    doc.links = doc.links.filter((l) => !ids.has(l.from) && !ids.has(l.to));
+    multi = new Set(); render(); renderInspector(); persist(); return;
+  }
   if (!sel) return;
   checkpoint();
   if (sel.kind === "node") { doc.nodes = doc.nodes.filter((n) => n.id !== sel.id); doc.links = doc.links.filter((l) => l.from !== sel.id && l.to !== sel.id); }
@@ -1247,12 +1315,12 @@ function addLink(from, to) {
   toast(L("เชื่อมสายแล้ว ใส่พอร์ตและความเร็วได้ที่แผงด้านขวา", "Link added. Set ports and speed in the right panel."));
 }
 const HINTS_EN = {
-  select: "<b>Select / move</b> click a device for details · drag to move · drag empty space to pan",
+  select: "<b>Select / move</b> click for details · drag to move · Shift+click or Shift+drag a box to pick several · drag empty space to pan",
   connect: "<b>Connect</b> drag from a device or zone to another, or click the start then the end · Esc to cancel",
   zone: "<b>Draw zone</b> drag on empty space to box a DMZ, VLAN or room/floor",
 };
 const HINTS = {
-  select: "<b>เลือก/ย้าย</b> คลิกอุปกรณ์เพื่อดูรายละเอียด · ลากเพื่อย้าย · ลากพื้นที่ว่างเพื่อเลื่อนผัง",
+  select: "<b>เลือก/ย้าย</b> คลิกเพื่อดูรายละเอียด · ลากเพื่อย้าย · Shift+คลิก หรือ Shift+ลากกรอบ เพื่อเลือกหลายชิ้น · ลากพื้นที่ว่างเพื่อเลื่อนผัง",
   connect: "<b>เชื่อมสาย</b> ลากจากอุปกรณ์หรือโซนต้นทางไปปลายทาง หรือคลิกต้นทางแล้วคลิกปลายทาง · Esc เพื่อยกเลิก",
   zone: "<b>วาดโซน</b> ลากบนพื้นที่ว่างเพื่อสร้างกรอบ DMZ, VLAN หรือห้อง/ชั้น",
 };
@@ -1265,11 +1333,46 @@ function setMode(m) {
 }
 
 /* ---------- Pointer interaction ---------- */
+// Everything a multi-selection moves: the picked devices and zones, plus devices sitting inside picked zones.
+function groupMembers() {
+  const nodeIds = new Set(), zoneIds = [];
+  for (const k of multi) {
+    if (k[0] === "n") nodeIds.add(k.slice(2));
+    else {
+      const z = findZone(k.slice(2)); zoneIds.push(z.id);
+      for (const n of doc.nodes) if (n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h) nodeIds.add(n.id);
+    }
+  }
+  return { nodes: [...nodeIds].map((id) => { const n = findNode(id); return [n, n.x, n.y]; }), zones: zoneIds.map((id) => { const z = findZone(id); return [z, z.x, z.y]; }) };
+}
+function moveGroup(g, dx, dy) {
+  for (const [n, x, y] of g.nodes) { n.x = x + dx; n.y = y + dy; }
+  for (const [z, x, y] of g.zones) { z.x = x + dx; z.y = y + dy; }
+}
 svg.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 && e.pointerType === "mouse") return;
   const p = toWorld(e);
   const t = e.target.closest("[data-kind]");
   const kind = t?.dataset.kind, id = t?.dataset.id;
+  const additive = mode === "select" && (e.shiftKey || e.ctrlKey || e.metaKey || multiMode);
+  if (additive && (kind === "node" || kind === "zone")) {
+    const ks = selectedKeys(), k = keyOf(kind, id);
+    if (ks.has(k)) ks.delete(k); else ks.add(k);
+    setSelection(ks); renderInspector(); render();
+    if (multi.has(k) || (sel && sel.id === id)) {
+      if (multi.size) drag = { type: "group", g: groupMembers(), px: p.x, py: p.y, before: JSON.stringify(doc), moved: false };
+      svg.setPointerCapture(e.pointerId);
+    }
+    return;
+  }
+  if (mode === "select" && (kind === "node" || kind === "zone") && multi.has(keyOf(kind, id))) {
+    drag = { type: "group", key: keyOf(kind, id), g: groupMembers(), px: p.x, py: p.y, before: JSON.stringify(doc), moved: false };
+    svg.setPointerCapture(e.pointerId); return;
+  }
+  if (additive && !kind) {
+    drag = { type: "marquee", x0: p.x, y0: p.y, x1: p.x, y1: p.y, base: selectedKeys() };
+    svg.setPointerCapture(e.pointerId); return;
+  }
   if (mode === "connect" && (kind === "node" || kind === "zone")) {
     if (pendingFrom && pendingFrom !== id) { const f = pendingFrom; pendingFrom = null; addLink(f, id); return; }
     drag = { type: "link", from: id, cx: p.x, cy: p.y, sx: e.clientX, sy: e.clientY };
@@ -1289,7 +1392,7 @@ svg.addEventListener("pointerdown", (e) => {
   } else if (kind === "link" && mode === "select") {
     sel = { kind: "link", id }; renderInspector();
   } else {
-    if (mode === "select" && sel) { sel = null; renderInspector(); }
+    if (mode === "select" && (sel || multi.size)) { sel = null; multi = new Set(); renderInspector(); }
     if (mode === "connect") pendingFrom = null;
     drag = { type: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
   }
@@ -1300,7 +1403,9 @@ svg.addEventListener("pointermove", (e) => {
   if (!drag) return;
   const p = toWorld(e);
   if (drag.type === "pan") { view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; applyView(); return; }
-  if (drag.type === "node") { const n = findNode(drag.id); n.x = snap(p.x - drag.ox); n.y = snap(p.y - drag.oy); drag.moved = true; }
+  if (drag.type === "group") { moveGroup(drag.g, snap(p.x - drag.px), snap(p.y - drag.py)); drag.moved = true; }
+  else if (drag.type === "marquee") { drag.x1 = p.x; drag.y1 = p.y; }
+  else if (drag.type === "node") { const n = findNode(drag.id); n.x = snap(p.x - drag.ox); n.y = snap(p.y - drag.oy); drag.moved = true; }
   else if (drag.type === "zone") {
     const z = findZone(drag.id), dx = snap(p.x - drag.px), dy = snap(p.y - drag.py);
     z.x = drag.sx + dx; z.y = drag.sy + dy;
@@ -1315,7 +1420,16 @@ svg.addEventListener("pointermove", (e) => {
 function endDrag(e) {
   if (!drag) return;
   const d = drag; drag = null;
-  if ((d.type === "node" || d.type === "zone" || d.type === "resize") && d.moved) {
+  if (d.type === "group" && !d.moved && d.key) { setSelection([d.key]); renderInspector(); }  // plain click on one of a group picks just that one
+  if (d.type === "marquee") {
+    const r = normRect(d), ks = new Set(d.base);
+    if (r.w > 4 || r.h > 4) {
+      for (const n of doc.nodes) if (n.x >= r.x && n.x <= r.x + r.w && n.y >= r.y && n.y <= r.y + r.h) ks.add(keyOf("node", n.id));
+      for (const z of doc.zones) if (z.x >= r.x && z.y >= r.y && z.x + z.w <= r.x + r.w && z.y + z.h <= r.y + r.h) ks.add(keyOf("zone", z.id));
+    }
+    setSelection(ks); renderInspector();
+  }
+  if ((d.type === "node" || d.type === "zone" || d.type === "resize" || d.type === "group") && d.moved) {
     undoStack.push(d.before); redoStack = []; updateUndoButtons(); persist();
   } else if (d.type === "link") {
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -1359,14 +1473,25 @@ document.addEventListener("keydown", (e) => {
   if (mod && e.key.toLowerCase() === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && e.key.toLowerCase() === "y" && !typing) { e.preventDefault(); redo(); return; }
   if (mod && e.key.toLowerCase() === "d" && !typing) { e.preventDefault(); duplicate(); return; }
+  if (mod && e.key.toLowerCase() === "a" && !typing) {
+    e.preventDefault();
+    setSelection([...doc.nodes.map((n) => keyOf("node", n.id)), ...doc.zones.map((z) => keyOf("zone", z.id))]);
+    render(); renderInspector(); return;
+  }
   if (typing) { if (e.key === "Escape") e.target.blur(); return; }
   if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); }
-  else if (e.key === "Escape") { if (pendingFrom || mode !== "select") setMode("select"); else { sel = null; render(); renderInspector(); } closeModals(); }
+  else if (e.key === "Escape") { if (pendingFrom || mode !== "select") setMode("select"); else { sel = null; multi = new Set(); render(); renderInspector(); } closeModals(); }
   else if (e.key === "v" || e.key === "V") setMode("select");
   else if (e.key === "c" || e.key === "C") setMode("connect");
   else if (e.key === "z" || e.key === "Z") setMode("zone");
   else if (e.key === "+" || e.key === "=") { const r = svg.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); }
   else if (e.key === "-") { const r = svg.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); }
+  else if (multi.size >= 2 && e.key.startsWith("Arrow")) {
+    e.preventDefault(); checkpoint();
+    const s = e.shiftKey ? 50 : 10, g = groupMembers();
+    moveGroup(g, e.key === "ArrowLeft" ? -s : e.key === "ArrowRight" ? s : 0, e.key === "ArrowUp" ? -s : e.key === "ArrowDown" ? s : 0);
+    render(); persist();
+  }
   else if (sel && sel.kind === "node" && e.key.startsWith("Arrow")) {
     e.preventDefault(); checkpoint();
     const n = findNode(sel.id), s = e.shiftKey ? 50 : 10;
@@ -1387,6 +1512,7 @@ $("#undoBtn").onclick = undo; $("#redoBtn").onclick = redo;
 $("#zoomIn").onclick = () => { const r = svg.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); };
 $("#zoomOut").onclick = () => { const r = svg.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); };
 $("#zoomFit").onclick = fit;
+$("#multiBtn").onclick = () => { multiMode = !multiMode; $("#multiBtn").setAttribute("aria-pressed", String(multiMode)); if (mode !== "select") setMode("select"); };
 $("#docTitle").addEventListener("focus", () => (editSnapshot = JSON.stringify(doc)));
 $("#docTitle").addEventListener("input", (e) => { doc.title = e.target.value; persist(); if (!sel) renderInspector(); });
 $("#docTitle").addEventListener("blur", () => { if (editSnapshot && editSnapshot !== JSON.stringify(doc)) { undoStack.push(editSnapshot); redoStack = []; updateUndoButtons(); } editSnapshot = null; });
