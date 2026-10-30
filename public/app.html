@@ -1465,15 +1465,17 @@ svg.addEventListener("dblclick", (e) => {
 
 /* ---------- Keyboard ---------- */
 document.addEventListener("keydown", (e) => {
-  if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") || (e.key === "/" && !e.target.matches("input,textarea,select"))) {
+  // Letter shortcuts follow the physical key, so they also work while the keyboard is set to Thai.
+  const k = /^Key[A-Z]$/.test(e.code || "") ? e.code.slice(3).toLowerCase() : (e.key || "").toLowerCase();
+  if (((e.ctrlKey || e.metaKey) && k === "f") || (e.key === "/" && !e.target.matches("input,textarea,select"))) {
     e.preventDefault(); const si = $("#searchInput"); si.focus(); si.select(); return;
   }
   const typing = e.target.matches("input,textarea,select");
   const mod = e.ctrlKey || e.metaKey;
-  if (mod && e.key.toLowerCase() === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
-  if (mod && e.key.toLowerCase() === "y" && !typing) { e.preventDefault(); redo(); return; }
-  if (mod && e.key.toLowerCase() === "d" && !typing) { e.preventDefault(); duplicate(); return; }
-  if (mod && e.key.toLowerCase() === "a" && !typing) {
+  if (mod && k === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && k === "y" && !typing) { e.preventDefault(); redo(); return; }
+  if (mod && k === "d" && !typing) { e.preventDefault(); duplicate(); return; }
+  if (mod && k === "a" && !typing) {
     e.preventDefault();
     setSelection([...doc.nodes.map((n) => keyOf("node", n.id)), ...doc.zones.map((z) => keyOf("zone", z.id))]);
     render(); renderInspector(); return;
@@ -1481,9 +1483,9 @@ document.addEventListener("keydown", (e) => {
   if (typing) { if (e.key === "Escape") e.target.blur(); return; }
   if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); }
   else if (e.key === "Escape") { if (pendingFrom || mode !== "select") setMode("select"); else { sel = null; multi = new Set(); render(); renderInspector(); } closeModals(); }
-  else if (e.key === "v" || e.key === "V") setMode("select");
-  else if (e.key === "c" || e.key === "C") setMode("connect");
-  else if (e.key === "z" || e.key === "Z") setMode("zone");
+  else if (k === "v") setMode("select");
+  else if (k === "c") setMode("connect");
+  else if (k === "z") setMode("zone");
   else if (e.key === "+" || e.key === "=") { const r = svg.getBoundingClientRect(); zoomAt(1.2, r.width / 2, r.height / 2); }
   else if (e.key === "-") { const r = svg.getBoundingClientRect(); zoomAt(1 / 1.2, r.width / 2, r.height / 2); }
   else if (multi.size >= 2 && e.key.startsWith("Arrow")) {
