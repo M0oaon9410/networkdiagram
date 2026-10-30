@@ -1,8 +1,17 @@
 <title>NetPlan</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
+/* Fonts ship with the app (public/fonts, SIL OFL) so Thai renders the same with no internet access. */
+@font-face { font-family: "NetPlan Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/ibm-plex-sans-thai-thai-400-normal.woff2) format("woff2"); unicode-range: U+0E01-0E5B,U+200C-200D,U+25CC; }
+@font-face { font-family: "NetPlan Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/ibm-plex-sans-thai-latin-400-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "NetPlan Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url(fonts/ibm-plex-sans-thai-thai-500-normal.woff2) format("woff2"); unicode-range: U+0E01-0E5B,U+200C-200D,U+25CC; }
+@font-face { font-family: "NetPlan Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url(fonts/ibm-plex-sans-thai-latin-500-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "NetPlan Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url(fonts/ibm-plex-sans-thai-thai-600-normal.woff2) format("woff2"); unicode-range: U+0E01-0E5B,U+200C-200D,U+25CC; }
+@font-face { font-family: "NetPlan Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url(fonts/ibm-plex-sans-thai-latin-600-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "NetPlan Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url(fonts/ibm-plex-sans-thai-thai-700-normal.woff2) format("woff2"); unicode-range: U+0E01-0E5B,U+200C-200D,U+25CC; }
+@font-face { font-family: "NetPlan Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url(fonts/ibm-plex-sans-thai-latin-700-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "NetPlan Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "NetPlan Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
 /* Layout: toolbar on top; device palette | blueprint canvas | inspector. Stacks to one column on phones. */
 :root {
   --bg: #e9edf2;
@@ -18,8 +27,8 @@
   --sel: #e19a06;
   --link: #6b7684;
   --danger: #c2392b;
-  --font-ui: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-ui: "NetPlan Sans", "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, system-ui, sans-serif;
+  --font-mono: "NetPlan Mono", "NetPlan Sans", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -63,6 +72,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn.danger.armed { background: var(--danger); color: #fff; border-color: var(--danger); }
 .btn:disabled { opacity: .45; cursor: default; }
 .sel-sm { padding: 5px 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); }
+.seg { gap: 0; }
+.seg .btn { border-radius: 0; padding: 6px 9px; }
+.seg .btn:first-child { border-radius: 7px 0 0 7px; }
+.seg .btn:last-child { border-radius: 0 7px 7px 0; margin-left: -1px; }
 .kbd { font-family: var(--font-mono); font-size: 11px; opacity: .7; }
 .spacer { flex: 1; }
 .server-pill { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
@@ -90,7 +103,23 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .zoomctl { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
 .zoomctl .btn { border: none; padding: 5px 8px; }
 .zoomctl span { font-family: var(--font-mono); font-size: 12px; color: var(--muted); align-self: center; min-width: 44px; text-align: center; }
-.hint { position: absolute; left: 12px; top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--muted); max-width: calc(100% - 24px); }
+.stage-top { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; pointer-events: none; }
+.stage-top > * { pointer-events: auto; }
+.hint { flex: 0 1 auto; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--muted); }
+.search { flex: 0 1 340px; min-width: 220px; margin-left: auto; position: relative; }
+.search-in { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; }
+.search-in:focus-within { border-color: var(--accent); }
+.search-in svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.search-in input { flex: 1; min-width: 0; border: none; background: transparent; padding: 7px 0; outline: none; }
+.search-res { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-height: min(60vh, 420px); overflow-y: auto; padding: 4px; box-shadow: 0 8px 24px rgb(0 0 0 / .18); z-index: 5; }
+.search-res .cnt { font-size: 12px; color: var(--muted); padding: 6px 8px 4px; }
+.res-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; text-align: left; padding: 6px 8px; border: none; background: transparent; border-radius: 6px; cursor: pointer; }
+.res-row:hover, .res-row.active { background: var(--panel-2); }
+.res-row .tile { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; }
+.res-row .tile svg { width: 18px; height: 18px; }
+.res-row b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-row small { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-row mark { background: color-mix(in srgb, var(--sel) 40%, transparent); color: inherit; border-radius: 2px; }
 .hint b { color: var(--fg); font-weight: 600; }
 
 .inspector { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px 14px 28px; }
@@ -182,7 +211,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
       <button class="btn" id="modeSelect" data-mode="select" title="เลือก / ย้าย (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg>เลือก/ย้าย</button>
       <button class="btn" id="modeConnect" data-mode="connect" title="ลากสายเชื่อม (C)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg>เชื่อมสาย</button>
       <select id="linkKind" class="sel-sm" aria-label="ชนิดสายเริ่มต้น" title="ชนิดสายที่จะสร้าง"></select>
-      <select id="linkRoute" class="sel-sm" aria-label="รูปแบบเส้นเริ่มต้น" title="รูปแบบเส้นที่จะสร้าง"><option value="straight">เส้นตรง</option><option value="elbow">เส้นหักมุม</option></select>
+      <select id="linkRoute" class="sel-sm" aria-label="รูปแบบเส้นเริ่มต้น" title="รูปแบบเส้นที่จะสร้าง"><option value="straight"></option><option value="elbow"></option></select>
       <button class="btn" id="modeZone" data-mode="zone" title="วาดโซน / VLAN (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>วาดโซน</button>
     </div>
     <div class="sep hide-sm"></div>
@@ -191,6 +220,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
       <button class="btn" id="redoBtn" title="ทำซ้ำ (Ctrl+Y)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 7 5 5-5 5"/><path d="M20 12H10a6 6 0 0 0 0 12"/></svg><span class="hide-sm">ทำซ้ำ</span></button>
     </div>
     <div class="spacer"></div>
+    <div class="grp seg" role="group" aria-label="ภาษา / Language" id="langSeg"><button class="btn" data-lang="th" lang="th">ไทย</button><button class="btn" data-lang="en" lang="en">EN</button></div>
     <span class="server-pill" id="serverPill" title=""><i></i><span>บันทึกในเบราว์เซอร์</span></span>
     <div class="grp">
       <button class="btn" id="filesBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>ผังทั้งหมด</button>
@@ -218,7 +248,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
         <rect id="bgRect" x="-50000" y="-50000" width="100000" height="100000" fill="url(#gridDots)"/>
         <g id="world"></g>
       </svg>
-      <div class="hint" id="hint"></div>
+      <div class="stage-top">
+        <div class="hint" id="hint"></div>
+        <div class="search" id="searchBox">
+          <div class="search-in">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+            <input id="searchInput" type="search" placeholder="ค้นหาชื่อ, IP, VLAN, MAC, รุ่น…" autocomplete="off" spellcheck="false" aria-label="ค้นหาอุปกรณ์ โซน หรือสาย" aria-controls="searchRes">
+            <span class="kbd hide-sm">Ctrl+F</span>
+          </div>
+          <div class="search-res" id="searchRes" role="listbox" hidden></div>
+        </div>
+      </div>
       <div class="zoomctl">
         <button class="btn" id="zoomOut" title="ซูมออก" aria-label="ซูมออก">−</button>
         <span id="zoomVal">100%</span>
@@ -233,7 +273,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 <div class="overlay" id="jsonModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jsonTitle">
     <h2 id="jsonTitle">เปิด / บันทึกผังเป็น JSON</h2>
-    <p class="muted" style="margin:0">ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”</p>
+    <p class="muted" id="jsonHelp" style="margin:0">ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”</p>
     <textarea id="jsonText" spellcheck="false" aria-label="ข้อมูล JSON"></textarea>
     <div class="actions" style="margin:0">
       <button class="btn primary" id="jsonLoad">โหลดจากข้อความนี้</button>
@@ -264,6 +304,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 <script>
 (() => {
 "use strict";
+
+/* ---------- Language ----------
+   Thai is the default; the choice is remembered per browser. L(th, en) picks the text. */
+let lang = "th";
+try { const v = localStorage.getItem("netplan.lang"); if (v === "en" || v === "th") lang = v; } catch (e) {}
+const L = (th, en) => (lang === "en" ? en : th);
+// Give each entry a `label` that follows the current language.
+function bilingual(obj, pairs) {
+  for (const [k, [th, en]] of Object.entries(pairs)) {
+    const target = typeof obj[k] === "object" ? obj[k] : null;
+    if (target) Object.defineProperty(target, "label", { get: () => L(th, en), enumerable: true, configurable: true });
+    else Object.defineProperty(obj, k, { get: () => L(th, en), enumerable: true, configurable: true });
+  }
+}
 
 /* ---------- Catalog ---------- */
 const CATS = {
@@ -320,6 +374,28 @@ const EXTRA_LABELS = {
   protocol: "Protocol", user: "ผู้ใช้งาน", dept: "แผนก", ext: "เบอร์ภายใน", resolution: "ความละเอียด", nvr: "NVR",
   va: "ขนาด (VA)", runtime: "Runtime",
 };
+bilingual(CATS, {
+  edge: ["WAN / ขอบเครือข่าย", "WAN / Edge"], security: ["ความปลอดภัย", "Security"], network: ["สวิตช์ / เครือข่าย", "Switching / Network"],
+  wireless: ["ไร้สาย", "Wireless"], compute: ["เซิร์ฟเวอร์ / จัดเก็บข้อมูล", "Servers / Storage"], endpoint: ["อุปกรณ์ปลายทาง", "Endpoints"], facility: ["ระบบสนับสนุน", "Facilities"],
+});
+bilingual(TYPES, {
+  internet: ["อินเทอร์เน็ต / คลาวด์", "Internet / Cloud"], router: ["เราเตอร์", "Router"], firewall: ["ไฟร์วอลล์", "Firewall"],
+  loadbalancer: ["โหลดบาลานเซอร์", "Load Balancer"], coreswitch: ["คอร์สวิตช์ (L3)", "Core Switch (L3)"], switch: ["สวิตช์", "Switch"],
+  ap: ["แอคเซสพอยต์ (AP)", "Access Point"], server: ["เซิร์ฟเวอร์", "Server"], database: ["ฐานข้อมูล", "Database"],
+  storage: ["NAS / สตอเรจ", "NAS / Storage"], pc: ["คอมพิวเตอร์ (PC)", "PC"], laptop: ["โน้ตบุ๊ก", "Laptop"],
+  printer: ["เครื่องพิมพ์", "Printer"], phone: ["โทรศัพท์ IP", "IP Phone"], camera: ["กล้อง CCTV", "CCTV Camera"], ups: ["เครื่องสำรองไฟ (UPS)", "UPS"],
+});
+bilingual(EXTRA_LABELS, {
+  isp: ["ผู้ให้บริการ (ISP)", "ISP"], circuit: ["รหัสวงจร (Circuit ID)", "Circuit ID"], bandwidth: ["แบนด์วิดท์", "Bandwidth"], wanIp: ["IP ฝั่ง WAN", "WAN IP"],
+  ports: ["จำนวนพอร์ต", "Ports"], routing: ["โปรโตคอลเราติ้ง", "Routing protocol"], ha: ["ระบบสำรอง (HA)", "High availability"],
+  policyZones: ["โซนความปลอดภัย", "Security zones"], license: ["License หมดอายุ", "License expiry"], vip: ["IP เสมือน (VIP)", "Virtual IP"],
+  pool: ["กลุ่มเซิร์ฟเวอร์ (Pool)", "Server pool"], uplink: ["อัปลิงก์", "Uplink"], stack: ["Stack / VSS", "Stack / VSS"], poe: ["PoE", "PoE"],
+  ssid: ["SSID", "SSID"], band: ["ย่านความถี่", "Band"], channel: ["ช่องสัญญาณ", "Channel"], controller: ["ตัวควบคุม (Controller)", "Controller"],
+  role: ["บทบาท / บริการ", "Role / services"], cpu: ["CPU", "CPU"], ram: ["RAM", "RAM"], disk: ["พื้นที่จัดเก็บ", "Storage"],
+  dbEngine: ["ระบบฐานข้อมูล", "Database engine"], svcPort: ["พอร์ตบริการ", "Service port"], capacity: ["ความจุ", "Capacity"], raid: ["RAID", "RAID"],
+  protocol: ["โปรโตคอล", "Protocol"], user: ["ผู้ใช้งาน", "User"], dept: ["แผนก", "Department"], ext: ["เบอร์ภายใน", "Extension"],
+  resolution: ["ความละเอียด", "Resolution"], nvr: ["เครื่องบันทึก (NVR)", "NVR"], va: ["ขนาด (VA)", "Capacity (VA)"], runtime: ["เวลาสำรองไฟ", "Runtime"],
+});
 const MONO_FIELDS = new Set(["ip", "mask", "gateway", "mac", "vlan", "serial", "wanIp", "vip", "circuit", "svcPort", "ports", "channel", "ext"]);
 const STATUS = {
   active: { label: "ใช้งานอยู่", color: "#2f9e5a" },
@@ -335,6 +411,11 @@ const LINKS = {
   wifi:  { label: "Wireless",       color: "#7a4fb8", width: 2,   dash: "2 5" },
   stack: { label: "Stack / HA",     color: "#2f7a4c", width: 4.5, dash: "" },
 };
+bilingual(STATUS, { active: ["ใช้งานอยู่", "Active"], planned: ["วางแผน / ยังไม่ติดตั้ง", "Planned / not installed"], maint: ["ซ่อมบำรุง", "Maintenance"], down: ["ใช้งานไม่ได้", "Down"] });
+bilingual(LINKS, {
+  eth: ["สาย LAN (UTP)", "Ethernet (UTP)"], fiber: ["ไฟเบอร์", "Fiber"], wan: ["WAN / ลีสด์ไลน์", "WAN / Leased line"],
+  vpn: ["VPN / อุโมงค์", "VPN / Tunnel"], wifi: ["ไร้สาย", "Wireless"], stack: ["Stack / HA", "Stack / HA"],
+});
 const ZONE_COLORS = { blue: "#3b62c9", green: "#2f8a55", red: "#c2462b", amber: "#c98a0b", violet: "#7a4fb8", slate: "#5a6472" };
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 const nodeColor = (n) => (HEX_RE.test(n.color || "") ? n.color : CATS[TYPES[n.type].cat].color);
@@ -419,7 +500,7 @@ const findNode = (id) => doc.nodes.find((n) => n.id === id);
 const findLink = (id) => doc.links.find((l) => l.id === id);
 const findZone = (id) => doc.zones.find((z) => z.id === id);
 // A link end is either a device or a zone.
-const endName = (id) => { const n = findNode(id); if (n) return n.name || TYPES[n.type].label; const z = findZone(id); return z ? z.name || "โซน" : "?"; };
+const endName = (id) => { const n = findNode(id); if (n) return n.name || TYPES[n.type].label; const z = findZone(id); return z ? z.name || L("โซน", "Zone") : "?"; };
 const endCenter = (id) => { const n = findNode(id); if (n) return { x: n.x, y: n.y }; const z = findZone(id); return z ? { x: z.x + z.w / 2, y: z.y + z.h / 2 } : null; };
 // Where a line toward `toward` meets the end: a device's center, or the zone's border.
 function endAnchor(id, toward) {
@@ -433,8 +514,8 @@ function endAnchor(id, toward) {
 }
 
 function normalize(d) {
-  if (!d || typeof d !== "object" || !Array.isArray(d.nodes)) throw new Error("ไม่พบรายการอุปกรณ์ (nodes) ในไฟล์");
-  const out = { version: 1, title: String(d.title || "ผังเครือข่าย"), nodes: [], links: [], zones: [] };
+  if (!d || typeof d !== "object" || !Array.isArray(d.nodes)) throw new Error(L("ไม่พบรายการอุปกรณ์ (nodes) ในไฟล์", "No devices (nodes) found in the file"));
+  const out = { version: 1, title: String(d.title || L("ผังเครือข่าย", "Network diagram")), nodes: [], links: [], zones: [] };
   for (const n of d.nodes) {
     if (!n || !n.id) continue;
     out.nodes.push({ name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", os: "", location: "", status: "active", notes: "",
@@ -484,14 +565,15 @@ function updateUndoButtons() {
 /* ---------- Persistence ---------- */
 let saveTimer = null;
 function persist() {
+  if (searchQ) runSearch();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId })); } catch (e) {}
     if (server && docId) {
       try {
         const r = await fetch("api/diagrams/" + encodeURIComponent(docId), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(doc) });
-        setPill(r.ok ? "บันทึกบนเซิร์ฟเวอร์แล้ว" : "บันทึกไม่สำเร็จ (" + r.status + ")", r.ok);
-      } catch (e) { setPill("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", false); }
+        setPill(r.ok ? L("บันทึกบนเซิร์ฟเวอร์แล้ว", "Saved to server") : L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")", r.ok);
+      } catch (e) { setPill(L("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server"), false); }
     }
   }, 600);
 }
@@ -742,15 +824,16 @@ function elbowAnchor(id, c, other, horiz) {
 }
 function diagramMarkup(opts = {}) {
   const exp = !!opts.export;
+  const hits = exp ? null : searchHits;
   let out = "";
   // zones
   for (const z of doc.zones) {
     const c = zoneColor(z);
     const isSel = !exp && sel && sel.kind === "zone" && sel.id === z.id;
     const isPend = !exp && pendingFrom === z.id;
-    out += `<g data-kind="zone" data-id="${z.id}">`;
+    out += `<g data-kind="zone" data-id="${z.id}"${hits && !hits.has(z.id) ? ' opacity=".35"' : ""}>`;
     out += `<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="12" fill="${c}" fill-opacity="${isPend ? ".16" : ".07"}" stroke="${isPend ? "var(--sel)" : c}" stroke-opacity=".75" stroke-width="${isSel || isPend ? 2.5 : 1.5}" stroke-dasharray="7 5" style="cursor:${mode === "connect" ? "crosshair" : "move"}"/>`;
-    out += `<text class="zlabel" x="${z.x + 12}" y="${z.y + 22}" fill="${c}" style="cursor:move">${esc(z.name || "โซน")}</text>`;
+    out += `<text class="zlabel" x="${z.x + 12}" y="${z.y + 22}" fill="${c}" style="cursor:move">${esc(z.name || L("โซน", "Zone"))}</text>`;
     out += `</g>`;
     if (isSel) out += `<rect data-kind="zone-resize" data-id="${z.id}" x="${z.x + z.w - 9}" y="${z.y + z.h - 9}" width="16" height="16" rx="3" fill="var(--panel)" stroke="${c}" stroke-width="2" style="cursor:nwse-resize"/>`;
   }
@@ -780,7 +863,8 @@ function diagramMarkup(opts = {}) {
     const t = LINKS[l.kind] || LINKS.eth;
     const col = t.color || (exp ? "#6b7684" : "var(--link)");
     const isSel = !exp && sel && sel.kind === "link" && sel.id === l.id;
-    out += `<g data-kind="link" data-id="${l.id}">`;
+    const lit = !hits || hits.has(l.id) || hits.has(l.from) || hits.has(l.to);
+    out += `<g data-kind="link" data-id="${l.id}"${lit ? "" : ' opacity=".15"'}>`;
     if (isSel) out += `<path d="${path}" fill="none" stroke="var(--sel)" stroke-opacity=".45" stroke-width="${t.width + 7}" stroke-linecap="round" stroke-linejoin="round"/>`;
     out += `<path d="${path}" fill="none" stroke="${col}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round"/>`;
     if (!exp) out += `<path class="hit" d="${path}"/>`;
@@ -818,7 +902,9 @@ function diagramMarkup(opts = {}) {
     const isSel = !exp && sel && sel.kind === "node" && sel.id === n.id;
     const isPend = !exp && pendingFrom === n.id;
     const planned = n.status === "planned";
-    out += `<g class="node" data-kind="node" data-id="${n.id}" transform="translate(${n.x} ${n.y})"${planned ? ' opacity=".7"' : ""}>`;
+    const op = hits && !hits.has(n.id) ? 0.18 : planned ? 0.7 : 1;
+    out += `<g class="node" data-kind="node" data-id="${n.id}" transform="translate(${n.x} ${n.y})"${op < 1 ? ` opacity="${op}"` : ""}>`;
+    if (hits && hits.has(n.id) && !isSel) out += `<rect x="-33" y="-33" width="66" height="66" rx="14" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
     if (isSel || isPend) out += `<rect class="ring" x="-33" y="-33" width="66" height="66" rx="14"${isPend ? ' stroke-dasharray="5 4"' : ""}/>`;
     out += `<rect x="-26" y="-26" width="52" height="52" rx="11" fill="${c}"${planned ? ` fill-opacity=".55" stroke="${c}" stroke-width="2" stroke-dasharray="5 3"` : ""}/>`;
     out += glyph(n.type, 32, -16, -16, inkFor(c));
@@ -859,11 +945,14 @@ function buildPalette() {
     const items = Object.entries(TYPES).filter(([, t]) => t.cat === ck);
     if (!items.length) continue;
     h += `<h3>${esc(c.label)}</h3><div class="pal-list">`;
-    for (const [k, t] of items) h += `<button class="pal-item" draggable="true" data-type="${k}" title="คลิกเพื่อเพิ่ม หรือลากไปวางบนผัง">${iconTile(k)}<span>${esc(t.label)}</span></button>`;
+    for (const [k, t] of items) h += `<button class="pal-item" draggable="true" data-type="${k}" title="${L("คลิกเพื่อเพิ่ม หรือลากไปวางบนผัง", "Click to add, or drag onto the diagram")}">${iconTile(k)}<span>${esc(t.label)}</span></button>`;
     h += `</div>`;
   }
-  h += `<p class="pal-hint">คลิกเพื่อเพิ่มกลางจอ หรือลากอุปกรณ์ไปวางตรงตำแหน่งที่ต้องการ</p>`;
+  h += `<p class="pal-hint">${L("คลิกเพื่อเพิ่มกลางจอ หรือลากอุปกรณ์ไปวางตรงตำแหน่งที่ต้องการ", "Click to add at the center, or drag a device to where you want it")}</p>`;
   p.innerHTML = h;
+}
+function bindPalette() {
+  const p = $("#palette");
   p.addEventListener("click", (e) => {
     const b = e.target.closest(".pal-item"); if (!b) return;
     const r = svg.getBoundingClientRect();
@@ -884,6 +973,67 @@ function buildPalette() {
     const p = toWorld(e); addNode(t, snap(p.x), snap(p.y));
   });
 }
+
+/* Static page text in both languages: [selector, what to set, Thai, English]. "text" sets the element's own
+   label text (after any icon), other values name an attribute. */
+const STATIC_TEXT = [
+  ["#docTitle", "aria-label", "ชื่อผัง", "Diagram name"],
+  ["#modeSelect", "text", "เลือก/ย้าย", "Select"], ["#modeSelect", "title", "เลือก / ย้าย (V)", "Select / move (V)"],
+  ["#modeConnect", "text", "เชื่อมสาย", "Connect"], ["#modeConnect", "title", "ลากสายเชื่อม (C)", "Draw a link (C)"],
+  ["#linkKind", "title", "ชนิดสายที่จะสร้าง", "Type for new links"], ["#linkKind", "aria-label", "ชนิดสายเริ่มต้น", "Type for new links"],
+  ["#linkRoute", "title", "รูปแบบเส้นที่จะสร้าง", "Line style for new links"], ["#linkRoute", "aria-label", "รูปแบบเส้นเริ่มต้น", "Line style for new links"],
+  ['#linkRoute option[value="straight"]', "text", "เส้นตรง", "Straight"], ['#linkRoute option[value="elbow"]', "text", "เส้นหักมุม", "Right-angle"],
+  ["#modeZone", "text", "วาดโซน", "Draw zone"], ["#modeZone", "title", "วาดโซน / VLAN (Z)", "Draw a zone / VLAN (Z)"],
+  ["#undoBtn .hide-sm", "text", "ย้อน", "Undo"], ["#undoBtn", "title", "ย้อนกลับ (Ctrl+Z)", "Undo (Ctrl+Z)"],
+  ["#redoBtn .hide-sm", "text", "ทำซ้ำ", "Redo"], ["#redoBtn", "title", "ทำซ้ำ (Ctrl+Y)", "Redo (Ctrl+Y)"],
+  ["#filesBtn", "text", "ผังทั้งหมด", "All diagrams"], ["#jsonBtn", "text", "เปิด/บันทึก JSON", "Open / save JSON"],
+  ["#exportSel", "aria-label", "ส่งออก", "Export"], ['#exportSel option[value=""]', "text", "ส่งออก…", "Export…"],
+  ['#exportSel option[value="png"]', "text", "รูปภาพ PNG", "PNG image"], ['#exportSel option[value="svg"]', "text", "รูปภาพ SVG", "SVG image"],
+  ['#exportSel option[value="csv"]', "text", "รายการอุปกรณ์ CSV", "Device list (CSV)"], ['#exportSel option[value="json"]', "text", "ไฟล์ผัง JSON", "Diagram file (JSON)"],
+  ["#newBtn", "text", "ผังใหม่", "New"], ["#newBtn", "title", "เริ่มผังใหม่", "Start a new diagram"],
+  ["#palette", "aria-label", "อุปกรณ์", "Devices"], ["#canvas", "aria-label", "พื้นที่วาดผังเครือข่าย", "Network diagram canvas"],
+  ["#searchInput", "placeholder", "ค้นหาชื่อ, IP, VLAN, MAC, รุ่น…", "Search name, IP, VLAN, MAC, model…"],
+  ["#searchInput", "aria-label", "ค้นหาอุปกรณ์ โซน หรือสาย", "Search devices, zones or links"],
+  ["#zoomOut", "title", "ซูมออก", "Zoom out"], ["#zoomOut", "aria-label", "ซูมออก", "Zoom out"],
+  ["#zoomIn", "title", "ซูมเข้า", "Zoom in"], ["#zoomIn", "aria-label", "ซูมเข้า", "Zoom in"],
+  ["#zoomFit", "text", "พอดีจอ", "Fit"], ["#zoomFit", "title", "พอดีจอ", "Fit to screen"],
+  ["#inspector", "aria-label", "รายละเอียด", "Details"],
+  ["#jsonTitle", "text", "เปิด / บันทึกผังเป็น JSON", "Open / save the diagram as JSON"],
+  ["#jsonHelp", "text", "ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”", "Below is the current diagram as JSON. Copy it to keep a copy, or paste saved JSON and press “Load this text”."],
+  ["#jsonText", "aria-label", "ข้อมูล JSON", "JSON data"],
+  ["#jsonLoad", "text", "โหลดจากข้อความนี้", "Load this text"], ["#jsonCopy", "text", "คัดลอก", "Copy"],
+  ["#jsonSave", "text", "บันทึกเป็นไฟล์", "Save as file"], ['label[for="jsonFile"]', "text", "เปิดไฟล์ .json…", "Open .json file…"],
+  ["#filesTitle", "text", "ผังที่บันทึกไว้บนเซิร์ฟเวอร์", "Diagrams saved on the server"], ["#filesNew", "text", "สร้างผังใหม่", "New diagram"],
+  ["[data-close]", "text", "ปิด", "Close"],
+];
+function setOwnText(el, txt) {
+  for (let i = el.childNodes.length - 1; i >= 0; i--) {
+    const n = el.childNodes[i];
+    if (n.nodeType === 3 && n.nodeValue.trim()) { n.nodeValue = txt; return; }
+  }
+  el.appendChild(document.createTextNode(txt));
+}
+function applyLang() {
+  document.documentElement.lang = lang;
+  for (const [sel, what, th, en] of STATIC_TEXT) {
+    for (const el of document.querySelectorAll(sel)) {
+      if (what === "text") setOwnText(el, L(th, en)); else el.setAttribute(what, L(th, en));
+    }
+  }
+  for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", String(b.dataset.lang === lang));
+  const kind = $("#linkKind").value;
+  $("#linkKind").innerHTML = Object.entries(LINKS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
+  if (kind) $("#linkKind").value = kind;
+  buildPalette();
+}
+function setLang(l) {
+  lang = l;
+  try { localStorage.setItem("netplan.lang", l); } catch (e) {}
+  applyLang(); setMode(mode); renderInspector(); render();
+  if (searchQ) runSearch();
+  if (server) setPill(L("เชื่อมต่อเซิร์ฟเวอร์แล้ว", "Connected to server"), true); else setPill(L("บันทึกอัตโนมัติในเบราว์เซอร์นี้", "Autosaved in this browser"), false);
+}
+for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLang(b.dataset.lang));
 function nextName(type) {
   const base = { internet: "Internet", router: "RT", firewall: "FW", loadbalancer: "LB", coreswitch: "CORE-SW", switch: "SW", ap: "AP", server: "SRV", database: "DB", storage: "NAS", pc: "PC", laptop: "NB", printer: "PRN", phone: "PHONE", camera: "CAM", ups: "UPS" }[type];
   if (type === "internet") return base;
@@ -913,11 +1063,11 @@ function field(label, key, val, o = {}) {
 const SWATCHES = ["#2f7a4c", "#1b7a8c", "#3a5a99", "#3b62c9", "#7a4fb8", "#b0418f", "#c2462b", "#d97706", "#c98a0b", "#7d8b1f", "#5a6472", "#2b2f36", "#0e9f6e", "#0891b2", "#e11d48", "#a16207"];
 // Full-range color picker (any of 16.7M colors) with a hex box, quick swatches and, for devices, a reset to the type color.
 function colorField(cur, custom) {
-  let h = `<div class="f full"><label for="f_color">สี</label><div class="colorrow">`;
-  h += `<input type="color" id="f_color" data-color value="${cur}" aria-label="เลือกสี">`;
-  h += `<input id="f_colorhex" class="mono hexbox" data-colorhex value="${cur}" maxlength="7" aria-label="รหัสสี" spellcheck="false" autocomplete="off">`;
-  h += `</div><div class="swatches">${SWATCHES.map((c) => `<button class="sw" data-swatch="${c}" style="background:${c}" title="${c}" aria-label="สี ${c}"></button>`).join("")}</div>`;
-  if (sel.kind === "node") h += `<button class="btn" data-color-reset style="justify-self:start;margin-top:6px"${custom ? "" : " disabled"}>ใช้สีตามชนิดอุปกรณ์</button>`;
+  let h = `<div class="f full"><label for="f_color">${L("สี", "Color")}</label><div class="colorrow">`;
+  h += `<input type="color" id="f_color" data-color value="${cur}" aria-label="${L("เลือกสี", "Pick a color")}">`;
+  h += `<input id="f_colorhex" class="mono hexbox" data-colorhex value="${cur}" maxlength="7" aria-label="${L("รหัสสี", "Hex color")}" spellcheck="false" autocomplete="off">`;
+  h += `</div><div class="swatches">${SWATCHES.map((c) => `<button class="sw" data-swatch="${c}" style="background:${c}" title="${c}" aria-label="${L("สี", "Color")} ${c}"></button>`).join("")}</div>`;
+  if (sel.kind === "node") h += `<button class="btn" data-color-reset style="justify-self:start;margin-top:6px"${custom ? "" : " disabled"}>${L("ใช้สีตามชนิดอุปกรณ์", "Use the device type color")}</button>`;
   return h + `</div>`;
 }
 const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
@@ -933,85 +1083,91 @@ function renderInspector() {
     const n = findNode(sel.id), t = TYPES[n.type];
     const linked = doc.links.filter((l) => l.from === n.id || l.to === n.id);
     h += `<div class="insp-head">${iconTile(n.type, nodeColor(n))}<div><h2>${esc(n.name || t.label)}</h2><small>${esc(t.label)} · ${esc(CATS[t.cat].label)}</small></div></div>`;
-    h += `<div class="sec">ข้อมูลหลัก</div><div class="fields">`;
-    h += field("ชื่ออุปกรณ์ / Hostname", "name", n.name, { full: true });
-    h += field("ชนิดอุปกรณ์", "type", n.type, { type: "select", options: Object.entries(TYPES).map(([k, v]) => [k, v.label]) });
-    h += field("สถานะ", "status", n.status, { type: "select", options: Object.entries(STATUS).map(([k, v]) => [k, v.label]) });
+    h += `<div class="sec">${L("ข้อมูลหลัก", "Basics")}</div><div class="fields">`;
+    h += field(L("ชื่ออุปกรณ์ / Hostname", "Name / hostname"), "name", n.name, { full: true });
+    h += field(L("ชนิดอุปกรณ์", "Device type"), "type", n.type, { type: "select", options: Object.entries(TYPES).map(([k, v]) => [k, v.label]) });
+    h += field(L("สถานะ", "Status"), "status", n.status, { type: "select", options: Object.entries(STATUS).map(([k, v]) => [k, v.label]) });
     h += colorField(nodeColor(n), !!n.color);
-    h += `</div><div class="sec">เครือข่าย</div><div class="fields">`;
-    h += field("IP Address", "ip", n.ip, { ph: "10.0.0.10" });
-    h += field("Subnet / Mask", "mask", n.mask, { ph: "/24" });
-    h += field("Gateway", "gateway", n.gateway, { ph: "10.0.0.1" });
+    h += `</div><div class="sec">${L("เครือข่าย", "Network")}</div><div class="fields">`;
+    h += field(L("ที่อยู่ IP", "IP address"), "ip", n.ip, { ph: "10.0.0.10" });
+    h += field(L("ซับเน็ต / Mask", "Subnet / mask"), "mask", n.mask, { ph: "/24" });
+    h += field(L("เกตเวย์", "Gateway"), "gateway", n.gateway, { ph: "10.0.0.1" });
     h += field("VLAN", "vlan", n.vlan, { ph: "10" });
-    h += field("MAC Address", "mac", n.mac, { full: true, ph: "00:1A:2B:3C:4D:5E" });
-    h += `</div><div class="sec">ฮาร์ดแวร์</div><div class="fields">`;
-    h += field("ยี่ห้อ", "vendor", n.vendor);
-    h += field("รุ่น", "model", n.model);
-    h += field("Serial No.", "serial", n.serial);
-    h += field("OS / Firmware", "os", n.os);
-    h += field("ตำแหน่งติดตั้ง / Rack", "location", n.location, { full: true });
-    h += `</div><div class="sec">เฉพาะ ${esc(t.label)}</div><div class="fields">`;
+    h += field(L("ที่อยู่ MAC", "MAC address"), "mac", n.mac, { full: true, ph: "00:1A:2B:3C:4D:5E" });
+    h += `</div><div class="sec">${L("ฮาร์ดแวร์", "Hardware")}</div><div class="fields">`;
+    h += field(L("ยี่ห้อ", "Vendor"), "vendor", n.vendor);
+    h += field(L("รุ่น", "Model"), "model", n.model);
+    h += field(L("หมายเลขซีเรียล", "Serial no."), "serial", n.serial);
+    h += field(L("ระบบปฏิบัติการ / เฟิร์มแวร์", "OS / firmware"), "os", n.os);
+    h += field(L("ตำแหน่งติดตั้ง / Rack", "Location / rack"), "location", n.location, { full: true });
+    h += `</div><div class="sec">${L("เฉพาะ", "")} ${esc(t.label)}${L("", " details")}</div><div class="fields">`;
     for (const k of t.extra) h += field(EXTRA_LABELS[k] || k, "extra." + k, n.extra[k] || "");
-    h += `</div><div class="sec">ฟิลด์เพิ่มเติม</div><div id="customRows">`;
+    h += `</div><div class="sec">${L("ฟิลด์เพิ่มเติม", "Custom fields")}</div><div id="customRows">`;
     n.custom.forEach((c, i) => {
-      h += `<div class="custom-row"><input aria-label="ชื่อฟิลด์" placeholder="ชื่อฟิลด์" data-custom="${i}" data-part="k" value="${esc(c.k)}"><input aria-label="ค่า" placeholder="ค่า" data-custom="${i}" data-part="v" value="${esc(c.v)}"><button class="icon-btn" data-custom-del="${i}" title="ลบฟิลด์" aria-label="ลบฟิลด์">${ICON_X}</button></div>`;
+      h += `<div class="custom-row"><input aria-label="${L("ชื่อฟิลด์", "Field name")}" placeholder="${L("ชื่อฟิลด์", "Field name")}" data-custom="${i}" data-part="k" value="${esc(c.k)}"><input aria-label="${L("ค่า", "Value")}" placeholder="${L("ค่า", "Value")}" data-custom="${i}" data-part="v" value="${esc(c.v)}"><button class="icon-btn" data-custom-del="${i}" title="${L("ลบฟิลด์", "Remove field")}" aria-label="${L("ลบฟิลด์", "Remove field")}">${ICON_X}</button></div>`;
     });
-    h += `</div><button class="btn" id="addCustom">+ เพิ่มฟิลด์</button>`;
-    h += `<div class="sec">หมายเหตุ</div><div class="fields">${field("บันทึก", "notes", n.notes, { type: "textarea", full: true })}</div>`;
+    h += `</div><button class="btn" id="addCustom">+ ${L("เพิ่มฟิลด์", "Add field")}</button>`;
+    h += `<div class="sec">${L("หมายเหตุ", "Notes")}</div><div class="fields">${field(L("บันทึก", "Notes"), "notes", n.notes, { type: "textarea", full: true })}</div>`;
     if (linked.length) {
-      h += `<div class="sec">การเชื่อมต่อ (${linked.length})</div><div class="list">`;
+      h += `<div class="sec">${L("การเชื่อมต่อ", "Connections")} (${linked.length})</div><div class="list">`;
       for (const l of linked) {
         h += linkRow(l, n.id);
       }
       h += `</div>`;
     }
-    h += `<div class="actions"><button class="btn" id="dupBtn">ทำสำเนา <span class="kbd">Ctrl+D</span></button><button class="btn" id="connectFromBtn">เชื่อมสายจากอุปกรณ์นี้</button><button class="btn danger" id="delBtn">ลบอุปกรณ์ <span class="kbd">Del</span></button></div>`;
+    h += `<div class="actions"><button class="btn" id="dupBtn">${L("ทำสำเนา", "Duplicate")} <span class="kbd">Ctrl+D</span></button><button class="btn" id="connectFromBtn">${L("เชื่อมสายจากอุปกรณ์นี้", "Connect from this device")}</button><button class="btn danger" id="delBtn">${L("ลบอุปกรณ์", "Delete device")} <span class="kbd">Del</span></button></div>`;
   } else if (sel && sel.kind === "link") {
     const l = findLink(sel.id), a = { name: endName(l.from) }, b = { name: endName(l.to) };
     const zoneEnds = (findZone(l.from) ? 1 : 0) + (findZone(l.to) ? 1 : 0);
-    h += `<div class="insp-head"><span class="tile" style="background:var(--panel-2);border:1px solid var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg></span><div><h2>${esc(a.name)} ↔ ${esc(b.name)}</h2><small>${zoneEnds === 2 ? "สายเชื่อมระหว่างโซน" : zoneEnds ? "สายเชื่อมอุปกรณ์กับโซน" : "สายเชื่อมต่อ"}</small></div></div>`;
+    h += `<div class="insp-head"><span class="tile" style="background:var(--panel-2);border:1px solid var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg></span><div><h2>${esc(a.name)} ↔ ${esc(b.name)}</h2><small>${zoneEnds === 2 ? L("สายเชื่อมระหว่างโซน", "Zone-to-zone link") : zoneEnds ? L("สายเชื่อมอุปกรณ์กับโซน", "Device-to-zone link") : L("สายเชื่อมต่อ", "Link")}</small></div></div>`;
     h += `<div class="fields">`;
-    h += field("ชนิดสาย", "kind", l.kind, { type: "select", options: Object.entries(LINKS).map(([k, v]) => [k, v.label]) });
-    h += field("รูปแบบเส้น", "route", l.route === "elbow" ? "elbow" : "straight", { type: "select", options: [["straight", "เส้นตรง"], ["elbow", "เส้นหักมุม"]] });
-    h += field("ป้ายบนสาย (ความเร็ว, VLAN)", "label", l.label, { full: true, ph: "1G, Trunk VLAN 10–40" });
-    h += field("พอร์ตฝั่ง " + (a.name || "A"), "fromPort", l.fromPort, { ph: "Gi1/0/1" });
-    h += field("พอร์ตฝั่ง " + (b.name || "B"), "toPort", l.toPort, { ph: "port1" });
+    h += field(L("ชนิดสาย", "Cable type"), "kind", l.kind, { type: "select", options: Object.entries(LINKS).map(([k, v]) => [k, v.label]) });
+    h += field(L("รูปแบบเส้น", "Line style"), "route", l.route === "elbow" ? "elbow" : "straight", { type: "select", options: [["straight", L("เส้นตรง", "Straight")], ["elbow", L("เส้นหักมุม", "Right-angle")]] });
+    h += field(L("ป้ายบนสาย (ความเร็ว, VLAN)", "Label (speed, VLAN)"), "label", l.label, { full: true, ph: "1G, Trunk VLAN 10–40" });
+    h += field(L("พอร์ตฝั่ง ", "Port on ") + (a.name || "A"), "fromPort", l.fromPort, { ph: "Gi1/0/1" });
+    h += field(L("พอร์ตฝั่ง ", "Port on ") + (b.name || "B"), "toPort", l.toPort, { ph: "port1" });
     h += field("หมายเหตุ", "notes", l.notes, { type: "textarea", full: true });
-    h += `</div><div class="actions"><button class="btn" id="swapBtn">สลับฝั่ง</button><button class="btn danger" id="delBtn">ลบสาย</button></div>`;
+    h += `</div><div class="actions"><button class="btn" id="swapBtn">${L("สลับฝั่ง", "Swap ends")}</button><button class="btn danger" id="delBtn">${L("ลบสาย", "Delete link")}</button></div>`;
   } else if (sel && sel.kind === "zone") {
     const z = findZone(sel.id);
     const inside = doc.nodes.filter((n) => n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h);
     h += `<div class="insp-head"><span class="tile" style="background:${zoneColor(z)};color:${inkFor(zoneColor(z))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg></span><div><h2>${esc(z.name || "โซน")}</h2><small>โซน / VLAN / พื้นที่ · มีอุปกรณ์ ${inside.length} ชิ้น</small></div></div>`;
     h += `<div class="fields">`;
-    h += field("ชื่อโซน", "name", z.name, { full: true, ph: "DMZ · 172.16.10.0/24" });
+    h += field(L("ชื่อโซน", "Zone name"), "name", z.name, { full: true, ph: "DMZ · 172.16.10.0/24" });
     h += colorField(zoneColor(z), false);
     h += field("หมายเหตุ", "notes", z.notes, { type: "textarea", full: true });
-    h += `</div><p class="muted" style="font-size:12.5px;line-height:1.55">ลากที่กรอบเพื่อย้ายโซนพร้อมอุปกรณ์ข้างใน ลากมุมขวาล่างเพื่อปรับขนาด</p>`;
+    h += `</div><p class="muted" style="font-size:12.5px;line-height:1.55">${L("ลากที่กรอบเพื่อย้ายโซนพร้อมอุปกรณ์ข้างใน ลากมุมขวาล่างเพื่อปรับขนาด", "Drag the zone to move it with the devices inside. Drag the bottom-right corner to resize.")}</p>`;
     const zl = doc.links.filter((l) => l.from === z.id || l.to === z.id);
     if (zl.length) {
-      h += `<div class="sec">การเชื่อมต่อ (${zl.length})</div><div class="list">`;
+      h += `<div class="sec">${L("การเชื่อมต่อ", "Connections")} (${zl.length})</div><div class="list">`;
       for (const l of zl) h += linkRow(l, z.id);
       h += `</div>`;
     }
-    h += `<div class="actions"><button class="btn" id="connectFromBtn">เชื่อมสายจากโซนนี้</button><button class="btn danger" id="delBtn">ลบโซน (อุปกรณ์ไม่ถูกลบ)</button></div>`;
+    h += `<div class="actions"><button class="btn" id="connectFromBtn">${L("เชื่อมสายจากโซนนี้", "Connect from this zone")}</button><button class="btn danger" id="delBtn">${L("ลบโซน (อุปกรณ์ไม่ถูกลบ)", "Delete zone (keeps devices)")}</button></div>`;
   } else {
     const counts = {};
     for (const n of doc.nodes) counts[n.type] = (counts[n.type] || 0) + 1;
-    h += `<div class="insp-head"><div><h2>${esc(doc.title)}</h2><small>อุปกรณ์ ${doc.nodes.length} · สาย ${doc.links.length} · โซน ${doc.zones.length}</small></div></div>`;
+    h += `<div class="insp-head"><div><h2>${esc(doc.title)}</h2><small>${L("อุปกรณ์", "Devices")} ${doc.nodes.length} · ${L("สาย", "Links")} ${doc.links.length} · ${L("โซน", "Zones")} ${doc.zones.length}</small></div></div>`;
     if (doc.nodes.length) {
-      h += `<div class="sec">อุปกรณ์ในผัง</div><div class="stats">`;
+      h += `<div class="sec">${L("อุปกรณ์ในผัง", "Devices in this diagram")}</div><div class="stats">`;
       for (const [k, t] of Object.entries(TYPES)) if (counts[k]) h += `<div class="t"><span class="dot" style="background:${CATS[t.cat].color}"></span>${esc(t.label)}</div><div class="n">${counts[k]}</div>`;
       h += `</div>`;
     }
-    h += `<div class="sec">ชนิดสาย</div><div class="legend">`;
+    h += `<div class="sec">${L("ชนิดสาย", "Cable types")}</div><div class="legend">`;
     for (const [, t] of Object.entries(LINKS)) h += `<div><svg viewBox="0 0 44 10"><line x1="2" y1="5" x2="42" y2="5" stroke="${t.color || "var(--link)"}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round"/></svg>${esc(t.label)}</div>`;
-    h += `</div><div class="sec">วิธีใช้</div><ul class="help">
+    h += `</div><div class="sec">${L("วิธีใช้", "How to use")}</div><ul class="help">${L(`
       <li><b>เพิ่มอุปกรณ์</b> คลิกหรือลากจากแถบด้านซ้าย</li>
       <li><b>ใส่รายละเอียด</b> คลิกอุปกรณ์ แล้วกรอกข้อมูลที่แผงนี้</li>
       <li><b>เชื่อมสาย</b> กดโหมด “เชื่อมสาย” (C) แล้วลากจากอุปกรณ์หรือโซนหนึ่งไปอีกอันหนึ่ง หรือคลิกทีละตัว</li>
       <li><b>โซน / VLAN</b> กด “วาดโซน” (Z) แล้วลากเป็นกรอบ</li>
       <li><b>เลื่อนผัง</b> ลากพื้นที่ว่าง · <b>ซูม</b> ล้อเมาส์</li>
-      <li><b>ลบ</b> Delete · <b>ย้อน</b> Ctrl+Z · <b>สำเนา</b> Ctrl+D</li>
+      <li><b>ลบ</b> Delete · <b>ย้อน</b> Ctrl+Z · <b>สำเนา</b> Ctrl+D · <b>ค้นหา</b> Ctrl+F</li>`, `
+      <li><b>Add a device</b> click or drag it from the left panel</li>
+      <li><b>Add details</b> click a device and fill in this panel</li>
+      <li><b>Connect</b> press “Connect” (C) and drag from one device or zone to another, or click one then the other</li>
+      <li><b>Zone / VLAN</b> press “Draw zone” (Z) and drag a box</li>
+      <li><b>Pan</b> drag empty space · <b>Zoom</b> mouse wheel</li>
+      <li><b>Delete</b> Delete · <b>Undo</b> Ctrl+Z · <b>Duplicate</b> Ctrl+D · <b>Search</b> Ctrl+F</li>`)}
     </ul>`;
   }
   inspector.innerHTML = h;
@@ -1088,8 +1244,13 @@ function addLink(from, to) {
   doc.links.push(l);
   sel = { kind: "link", id: l.id };
   render(); renderInspector(); persist();
-  toast("เชื่อมสายแล้ว ใส่พอร์ตและความเร็วได้ที่แผงด้านขวา");
+  toast(L("เชื่อมสายแล้ว ใส่พอร์ตและความเร็วได้ที่แผงด้านขวา", "Link added. Set ports and speed in the right panel."));
 }
+const HINTS_EN = {
+  select: "<b>Select / move</b> click a device for details · drag to move · drag empty space to pan",
+  connect: "<b>Connect</b> drag from a device or zone to another, or click the start then the end · Esc to cancel",
+  zone: "<b>Draw zone</b> drag on empty space to box a DMZ, VLAN or room/floor",
+};
 const HINTS = {
   select: "<b>เลือก/ย้าย</b> คลิกอุปกรณ์เพื่อดูรายละเอียด · ลากเพื่อย้าย · ลากพื้นที่ว่างเพื่อเลื่อนผัง",
   connect: "<b>เชื่อมสาย</b> ลากจากอุปกรณ์หรือโซนต้นทางไปปลายทาง หรือคลิกต้นทางแล้วคลิกปลายทาง · Esc เพื่อยกเลิก",
@@ -1099,7 +1260,7 @@ function setMode(m) {
   mode = m; pendingFrom = null;
   for (const b of document.querySelectorAll("[data-mode]")) b.setAttribute("aria-pressed", String(b.dataset.mode === m));
   svg.setAttribute("class", "mode-" + m);
-  $("#hint").innerHTML = HINTS[m];
+  $("#hint").innerHTML = L(HINTS[m], HINTS_EN[m]);
   render();
 }
 
@@ -1167,7 +1328,7 @@ function endDrag(e) {
     const r = normRect(d);
     if (r.w >= 60 && r.h >= 40) {
       checkpoint();
-      const z = { id: uid("z"), ...r, name: "โซนใหม่", color: "blue", notes: "" };
+      const z = { id: uid("z"), ...r, name: L("โซนใหม่", "New zone"), color: "blue", notes: "" };
       doc.zones.push(z); sel = { kind: "zone", id: z.id };
       setMode("select"); renderInspector(); persist();
       setTimeout(() => { const i = $("#f_name"); i && (i.focus(), i.select()); }, 0);
@@ -1190,6 +1351,9 @@ svg.addEventListener("dblclick", (e) => {
 
 /* ---------- Keyboard ---------- */
 document.addEventListener("keydown", (e) => {
+  if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") || (e.key === "/" && !e.target.matches("input,textarea,select"))) {
+    e.preventDefault(); const si = $("#searchInput"); si.focus(); si.select(); return;
+  }
   const typing = e.target.matches("input,textarea,select");
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
@@ -1217,7 +1381,6 @@ function toast(msg) {
   clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 2600);
 }
 for (const b of document.querySelectorAll("[data-mode]")) b.addEventListener("click", () => setMode(b.dataset.mode));
-$("#linkKind").innerHTML = Object.entries(LINKS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
 try { const r = localStorage.getItem("netplan.route"); if (r === "elbow" || r === "straight") $("#linkRoute").value = r; } catch (e) {}
 $("#linkRoute").addEventListener("change", (e) => { try { localStorage.setItem("netplan.route", e.target.value); } catch (err) {} });
 $("#undoBtn").onclick = undo; $("#redoBtn").onclick = redo;
@@ -1231,19 +1394,19 @@ $("#docTitle").addEventListener("blur", () => { if (editSnapshot && editSnapshot
 const newBtn = $("#newBtn");
 newBtn.addEventListener("click", async () => {
   if (!newBtn.classList.contains("armed")) {
-    newBtn.classList.add("armed"); newBtn.textContent = "กดอีกครั้งเพื่อล้างผัง";
-    clearTimeout(newBtn._t); newBtn._t = setTimeout(() => { newBtn.classList.remove("armed"); newBtn.textContent = "ผังใหม่"; }, 3500);
+    newBtn.classList.add("armed"); newBtn.textContent = L("กดอีกครั้งเพื่อล้างผัง", "Click again to clear");
+    clearTimeout(newBtn._t); newBtn._t = setTimeout(() => { newBtn.classList.remove("armed"); newBtn.textContent = L("ผังใหม่", "New"); }, 3500);
     return;
   }
-  clearTimeout(newBtn._t); newBtn.classList.remove("armed"); newBtn.textContent = "ผังใหม่";
+  clearTimeout(newBtn._t); newBtn.classList.remove("armed"); newBtn.textContent = L("ผังใหม่", "New");
   await newDiagram();
 });
 async function newDiagram() {
-  if (server) { await createOnServer({ version: 1, title: "ผังเครือข่ายใหม่", nodes: [], links: [], zones: [] }); return; }
+  if (server) { await createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] }); return; }
   checkpoint();
-  doc = { version: 1, title: "ผังเครือข่ายใหม่", nodes: [], links: [], zones: [] };
+  doc = { version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] };
   sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView();
-  toast("เริ่มผังใหม่แล้ว กด ย้อน ถ้าต้องการผังเดิมคืน");
+  toast(L("เริ่มผังใหม่แล้ว กด ย้อน ถ้าต้องการผังเดิมคืน", "Started a new diagram. Press Undo to get the old one back."));
 }
 
 /* ---------- Files: downloads ---------- */
@@ -1252,8 +1415,8 @@ function safeName(ext) { return (doc.title || "network-diagram").replace(/[\\/:*
 async function saveFile(filename, data, mime) {
   const dl = await dlPromise;
   if (dl) {
-    try { await dl.save({ filename, data }); toast("บันทึกไฟล์ " + filename + " แล้ว"); }
-    catch (err) { if (err && err.code !== "declined") toast("บันทึกไฟล์ไม่สำเร็จ: " + (err.message || err.code)); }
+    try { await dl.save({ filename, data }); toast(L("บันทึกไฟล์ ", "Saved ") + filename + L(" แล้ว", "")); }
+    catch (err) { if (err && err.code !== "declined") toast(L("บันทึกไฟล์ไม่สำเร็จ: ", "Couldn't save the file: ") + (err.message || err.code)); }
     return;
   }
   const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
@@ -1262,24 +1425,46 @@ async function saveFile(filename, data, mime) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
-const EXPORT_CSS = `.nlabel{font:600 12.5px 'IBM Plex Sans Thai','Noto Sans Thai',Tahoma,sans-serif;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
-.nip{font:500 11px 'IBM Plex Mono',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
-.llabel{font:500 11px 'IBM Plex Mono',Consolas,monospace;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
-.lport{font:500 10px 'IBM Plex Mono',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
-.zlabel{font:700 13px 'IBM Plex Sans Thai','Noto Sans Thai',Tahoma,sans-serif}.statdot{stroke:#fff;stroke-width:2}
-.ttl{font:700 18px 'IBM Plex Sans Thai','Noto Sans Thai',Tahoma,sans-serif;fill:#18212d}.sub{font:400 12px 'IBM Plex Sans Thai',Tahoma,sans-serif;fill:#5d6a7a}`;
-function exportSVG() {
+const EXPORT_CSS = `.nlabel{font:600 12.5px 'NetPlan Sans','Noto Sans Thai',Tahoma,sans-serif;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.nip{font:500 11px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.llabel{font:500 11px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.lport{font:500 10px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
+.zlabel{font:700 13px 'NetPlan Sans','Noto Sans Thai',Tahoma,sans-serif}.statdot{stroke:#fff;stroke-width:2}
+.ttl{font:700 18px 'NetPlan Sans','Noto Sans Thai',Tahoma,sans-serif;fill:#18212d}.sub{font:400 12px 'NetPlan Sans',Tahoma,sans-serif;fill:#5d6a7a}`;
+// An exported SVG/PNG is drawn as a standalone image, which cannot load the page's fonts,
+// so the faces it uses are inlined as data URIs (fetched once, then cached).
+const EXPORT_FACES = [["NetPlan Sans", 400, "ibm-plex-sans-thai-thai-400-normal"], ["NetPlan Sans", 400, "ibm-plex-sans-thai-latin-400-normal"],
+  ["NetPlan Sans", 600, "ibm-plex-sans-thai-thai-600-normal"], ["NetPlan Sans", 600, "ibm-plex-sans-thai-latin-600-normal"],
+  ["NetPlan Sans", 700, "ibm-plex-sans-thai-thai-700-normal"], ["NetPlan Sans", 700, "ibm-plex-sans-thai-latin-700-normal"],
+  ["NetPlan Mono", 500, "ibm-plex-mono-latin-500-normal"]];
+let exportFontCss = null;
+async function loadExportFonts() {
+  if (exportFontCss !== null) return exportFontCss;
+  try {
+    const parts = await Promise.all(EXPORT_FACES.map(async ([fam, w, file]) => {
+      const r = await fetch("fonts/" + file + ".woff2");
+      if (!r.ok) throw new Error(r.status);
+      const buf = new Uint8Array(await r.arrayBuffer());
+      let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      const range = file.includes("-thai-thai-") ? "U+0E01-0E5B,U+200C-200D,U+25CC" : "U+0000-00FF,U+2000-206F,U+20AC,U+2122,U+2190-2193,U+2212";
+      return `@font-face{font-family:'${fam}';font-weight:${w};src:url(data:font/woff2;base64,${btoa(bin)}) format('woff2');unicode-range:${range}}`;
+    }));
+    exportFontCss = parts.join("\n");
+  } catch (e) { exportFontCss = ""; }
+  return exportFontCss;
+}
+async function exportSVG() {
+  const fonts = await loadExportFonts();
   const b = bbox(), pad = 40, head = 56;
   const w = Math.ceil(b.w + pad * 2), h = Math.ceil(b.h + pad * 2 + head);
-  const date = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><style>${EXPORT_CSS}</style>
+  const date = new Date().toLocaleDateString(L("th-TH", "en-GB"), { year: "numeric", month: "long", day: "numeric" });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><style>${fonts}${EXPORT_CSS}</style>
 <rect width="100%" height="100%" fill="#ffffff"/>
-<text class="ttl" x="${pad}" y="34">${esc(doc.title)}</text><text class="sub" x="${pad}" y="54">อุปกรณ์ ${doc.nodes.length} · สาย ${doc.links.length} · ${esc(date)}</text>
+<text class="ttl" x="${pad}" y="34">${esc(doc.title)}</text><text class="sub" x="${pad}" y="54">${L("อุปกรณ์", "Devices")} ${doc.nodes.length} · ${L("สาย", "Links")} ${doc.links.length} · ${esc(date)}</text>
 <g transform="translate(${pad - b.x} ${pad + head - b.y})">${diagramMarkup({ export: true })}</g></svg>`;
 }
 function exportPNG() {
-  return new Promise((resolve, reject) => {
-    const s = exportSVG();
+  return exportSVG().then((s) => new Promise((resolve, reject) => {
     const m = s.match(/width="(\d+)" height="(\d+)"/);
     const w = +m[1], h = +m[2], scale = Math.min(2, 8000 / Math.max(w, h));
     const img = new Image();
@@ -1292,10 +1477,10 @@ function exportPNG() {
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("svg")); };
     img.src = url;
-  });
+  }));
 }
 function exportCSV() {
-  const cols = [["name", "ชื่อ"], ["type", "ชนิด"], ["status", "สถานะ"], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["vendor", "ยี่ห้อ"], ["model", "รุ่น"], ["serial", "Serial"], ["os", "OS/Firmware"], ["location", "ตำแหน่ง"], ["extra", "ข้อมูลเฉพาะ"], ["custom", "ฟิลด์เพิ่มเติม"], ["links", "เชื่อมต่อกับ"], ["notes", "หมายเหตุ"]];
+  const cols = [["name", L("ชื่อ", "Name")], ["type", L("ชนิด", "Type")], ["status", L("สถานะ", "Status")], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["vendor", L("ยี่ห้อ", "Vendor")], ["model", L("รุ่น", "Model")], ["serial", "Serial"], ["os", "OS/Firmware"], ["location", L("ตำแหน่ง", "Location")], ["extra", L("ข้อมูลเฉพาะ", "Type details")], ["custom", L("ฟิลด์เพิ่มเติม", "Custom fields")], ["links", L("เชื่อมต่อกับ", "Connected to")], ["notes", L("หมายเหตุ", "Notes")]];
   const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
   const rows = [cols.map((c) => q(c[1])).join(",")];
   for (const n of doc.nodes) {
@@ -1315,11 +1500,11 @@ function exportCSV() {
 $("#exportSel").addEventListener("change", async (e) => {
   const v = e.target.value; e.target.value = "";
   try {
-    if (v === "svg") await saveFile(safeName("svg"), exportSVG(), "image/svg+xml");
+    if (v === "svg") await saveFile(safeName("svg"), await exportSVG(), "image/svg+xml");
     else if (v === "png") await saveFile(safeName("png"), await exportPNG(), "image/png");
     else if (v === "csv") await saveFile(safeName("csv"), exportCSV(), "text/csv");
     else if (v === "json") await saveFile(safeName("json"), JSON.stringify(doc, null, 2), "application/json");
-  } catch (err) { toast("ส่งออกไม่สำเร็จ ลองอีกครั้ง"); }
+  } catch (err) { toast(L("ส่งออกไม่สำเร็จ ลองอีกครั้ง", "Export failed. Try again.")); }
 });
 
 /* ---------- JSON modal ---------- */
@@ -1331,8 +1516,8 @@ for (const m of document.querySelectorAll(".overlay")) {
 $("#jsonBtn").onclick = () => { $("#jsonText").value = JSON.stringify(doc, null, 2); openModal("#jsonModal"); };
 $("#jsonCopy").onclick = async () => {
   const ta = $("#jsonText");
-  try { await navigator.clipboard.writeText(ta.value); toast("คัดลอกแล้ว"); }
-  catch (e) { ta.focus(); ta.select(); toast("เลือกข้อความแล้ว กด Ctrl+C เพื่อคัดลอก"); }
+  try { await navigator.clipboard.writeText(ta.value); toast(L("คัดลอกแล้ว", "Copied")); }
+  catch (e) { ta.focus(); ta.select(); toast(L("เลือกข้อความแล้ว กด Ctrl+C เพื่อคัดลอก", "Text selected. Press Ctrl+C to copy.")); }
 };
 $("#jsonSave").onclick = () => saveFile(safeName("json"), JSON.stringify(doc, null, 2), "application/json");
 function loadDoc(d) {
@@ -1340,14 +1525,14 @@ function loadDoc(d) {
   checkpoint(); doc = nd; sel = null; afterDocSwap(); fit();
 }
 $("#jsonLoad").onclick = () => {
-  try { loadDoc(JSON.parse($("#jsonText").value)); closeModals(); persistNewOrCurrent(); toast("โหลดผังแล้ว"); }
-  catch (e) { toast("อ่าน JSON ไม่ได้: " + e.message); }
+  try { loadDoc(JSON.parse($("#jsonText").value)); closeModals(); persistNewOrCurrent(); toast(L("โหลดผังแล้ว", "Diagram loaded")); }
+  catch (e) { toast(L("อ่าน JSON ไม่ได้: ", "Couldn't read the JSON: ") + e.message); }
 };
 $("#jsonFile").addEventListener("change", async (e) => {
   const f = e.target.files[0]; e.target.value = "";
   if (!f) return;
-  try { loadDoc(JSON.parse(await f.text())); closeModals(); persistNewOrCurrent(); toast("เปิดไฟล์ " + f.name + " แล้ว"); }
-  catch (err) { toast("เปิดไฟล์ไม่ได้: " + err.message); }
+  try { loadDoc(JSON.parse(await f.text())); closeModals(); persistNewOrCurrent(); toast(L("เปิดไฟล์ ", "Opened ") + f.name + L(" แล้ว", "")); }
+  catch (err) { toast(L("เปิดไฟล์ไม่ได้: ", "Couldn't open the file: ") + err.message); }
 });
 async function persistNewOrCurrent() {
   if (server) await createOnServer(doc, true); else persist();
@@ -1361,21 +1546,21 @@ async function createOnServer(d, keepDoc) {
     const j = await r.json();
     if (!keepDoc) { checkpoint(); doc = normalize(d); sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView(); }
     docId = j.id; persist(); closeModals();
-    toast("สร้างผังบนเซิร์ฟเวอร์แล้ว");
-  } catch (e) { toast("สร้างผังบนเซิร์ฟเวอร์ไม่สำเร็จ"); }
+    toast(L("สร้างผังบนเซิร์ฟเวอร์แล้ว", "Diagram created on the server"));
+  } catch (e) { toast(L("สร้างผังบนเซิร์ฟเวอร์ไม่สำเร็จ", "Couldn't create the diagram on the server")); }
 }
 async function openFiles() {
   const box = $("#filesList");
-  box.innerHTML = `<p class="muted">กำลังโหลด…</p>`;
+  box.innerHTML = `<p class="muted">${L("กำลังโหลด…", "Loading…")}</p>`;
   openModal("#filesModal");
   try {
     const list = await (await fetch("api/diagrams", { cache: "no-store" })).json();
-    if (!list.length) { box.innerHTML = `<p class="muted">ยังไม่มีผังบนเซิร์ฟเวอร์</p>`; return; }
-    box.innerHTML = list.map((x) => `<div class="list-row${x.id === docId ? " current" : ""}"><div><b>${esc(x.title)}</b><small>อุปกรณ์ ${x.nodes} · แก้ไขล่าสุด ${esc(new Date(x.updatedAt).toLocaleString("th-TH"))}${x.id === docId ? " · กำลังเปิดอยู่" : ""}</small></div><button class="btn" data-open="${esc(x.id)}">เปิด</button><button class="btn danger" data-del="${esc(x.id)}">ลบ</button></div>`).join("");
-  } catch (e) { box.innerHTML = `<p class="muted">โหลดรายการไม่ได้ ตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่</p>`; }
+    if (!list.length) { box.innerHTML = `<p class="muted">${L("ยังไม่มีผังบนเซิร์ฟเวอร์", "No diagrams on the server yet")}</p>`; return; }
+    box.innerHTML = list.map((x) => `<div class="list-row${x.id === docId ? " current" : ""}"><div><b>${esc(x.title)}</b><small>${L("อุปกรณ์", "Devices")} ${x.nodes} · ${L("แก้ไขล่าสุด", "Last edited")} ${esc(new Date(x.updatedAt).toLocaleString(L("th-TH", "en-GB")))}${x.id === docId ? L(" · กำลังเปิดอยู่", " · open now") : ""}</small></div><button class="btn" data-open="${esc(x.id)}">${L("เปิด", "Open")}</button><button class="btn danger" data-del="${esc(x.id)}">${L("ลบ", "Delete")}</button></div>`).join("");
+  } catch (e) { box.innerHTML = `<p class="muted">${L("โหลดรายการไม่ได้ ตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่", "Couldn't load the list. Check that the server is running.")}</p>`; }
 }
 $("#filesBtn").onclick = openFiles;
-$("#filesNew").onclick = () => createOnServer({ version: 1, title: "ผังเครือข่ายใหม่", nodes: [], links: [], zones: [] });
+$("#filesNew").onclick = () => createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] });
 $("#filesList").addEventListener("click", async (e) => {
   const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
   if (o) {
@@ -1383,15 +1568,108 @@ $("#filesList").addEventListener("click", async (e) => {
       const r = await fetch("api/diagrams/" + encodeURIComponent(o.dataset.open), { cache: "no-store" });
       const j = normalize(await r.json());
       doc = j; docId = o.dataset.open; undoStack = []; redoStack = []; sel = null; afterDocSwap(); fit(); closeModals();
-    } catch (err) { toast("เปิดผังไม่ได้"); }
+    } catch (err) { toast(L("เปิดผังไม่ได้", "Couldn't open the diagram")); }
   }
   if (d) {
-    if (!d.classList.contains("armed")) { d.classList.add("armed"); d.textContent = "ยืนยันลบ"; return; }
+    if (!d.classList.contains("armed")) { d.classList.add("armed"); d.textContent = L("ยืนยันลบ", "Confirm delete"); return; }
     await fetch("api/diagrams/" + encodeURIComponent(d.dataset.del), { method: "DELETE" });
     if (d.dataset.del === docId) docId = null;
     openFiles();
   }
 });
+
+/* ---------- Search ----------
+   Matches every typed word (Thai or English, any case) against a device's
+   name, type, addresses, hardware, location, notes and custom fields, a zone's
+   name and notes, and a cable's label, ports and ends. */
+let searchQ = "", searchHits = null, searchList = [], searchActive = 0;
+const normText = (s) => String(s ?? "").normalize("NFC").toLocaleLowerCase("th");
+function searchFields(n) {
+  const t = TYPES[n.type];
+  const f = [["", n.name], [L("ชนิด", "Type"), t.label], ["IP", n.ip], ["Subnet", n.mask], ["Gateway", n.gateway], ["VLAN", n.vlan], ["MAC", n.mac],
+    [L("ยี่ห้อ", "Vendor"), n.vendor], [L("รุ่น", "Model"), n.model], ["Serial", n.serial], ["OS", n.os], [L("ตำแหน่ง", "Location"), n.location], [L("สถานะ", "Status"), STATUS[n.status]?.label], [L("หมายเหตุ", "Notes"), n.notes]];
+  for (const k of t.extra) f.push([EXTRA_LABELS[k] || k, n.extra[k]]);
+  for (const c of n.custom) f.push([c.k || L("ฟิลด์", "Field"), c.v], [L("ฟิลด์", "Field"), c.k]);
+  return f.filter(([, v]) => v);
+}
+function highlight(text, terms) {
+  let out = esc(text);
+  for (const t of terms) {
+    const i = normText(text).indexOf(t);
+    if (i < 0) continue;
+    const raw = String(text);
+    return esc(raw.slice(0, i)) + "<mark>" + esc(raw.slice(i, i + t.length)) + "</mark>" + esc(raw.slice(i + t.length));
+  }
+  return out;
+}
+function runSearch() {
+  const terms = normText(searchQ).trim().split(/\s+/).filter(Boolean);
+  const box = $("#searchRes");
+  if (!terms.length) { searchHits = null; searchList = []; box.hidden = true; render(); return; }
+  const all = (hay) => terms.every((t) => hay.includes(t));
+  const list = [];
+  for (const n of doc.nodes) {
+    const f = searchFields(n);
+    if (!all(normText(f.map((x) => x[0] + " " + x[1]).join("\n") + "\n" + n.type))) continue;
+    // show the field that matched first word, unless that is the name
+    const m = f.find(([, v]) => normText(v).includes(terms[0]));
+    const sub = m && m[0] ? `${m[0]}: ${m[1]}` : [TYPES[n.type].label, n.ip].filter(Boolean).join(" · ");
+    list.push({ kind: "node", id: n.id, title: n.name || TYPES[n.type].label, sub, icon: iconTile(n.type, nodeColor(n)), at: { x: n.x, y: n.y } });
+  }
+  for (const z of doc.zones) {
+    if (!all(normText([z.name, z.notes, "โซน zone"].join("\n")))) continue;
+    const c = zoneColor(z);
+    list.push({ kind: "zone", id: z.id, title: z.name || L("โซน", "Zone"), sub: L("โซน", "Zone") + (z.notes ? " · " + z.notes : ""), icon: `<span class="tile" style="background:${c};color:${inkFor(c)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.5"><rect x="3" y="4" width="18" height="16" rx="2"/></svg></span>`, at: { x: z.x + z.w / 2, y: z.y + z.h / 2 } });
+  }
+  for (const l of doc.links) {
+    const a = endName(l.from), b = endName(l.to);
+    if (!all(normText([l.label, l.fromPort, l.toPort, l.notes, LINKS[l.kind].label, a, b].join("\n")))) continue;
+    const ca = endCenter(l.from), cb = endCenter(l.to);
+    list.push({ kind: "link", id: l.id, title: `${a} ↔ ${b}`, sub: [LINKS[l.kind].label, l.label, l.fromPort && l.toPort ? `${l.fromPort} → ${l.toPort}` : l.fromPort || l.toPort].filter(Boolean).join(" · "), icon: `<span class="tile" style="background:var(--panel-2);border:1px solid var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="6" r="2.5"/><path d="M7 16 17 8"/></svg></span>`, at: ca && cb ? { x: (ca.x + cb.x) / 2, y: (ca.y + cb.y) / 2 } : null });
+  }
+  searchList = list;
+  searchHits = new Set(list.map((r) => r.id));
+  searchActive = Math.min(searchActive, Math.max(0, list.length - 1));
+  let h = `<div class="cnt">${list.length ? L(`พบ ${list.length} รายการ`, `${list.length} found`) : L(`ไม่พบ “${esc(searchQ.trim())}”`, `Nothing matches “${esc(searchQ.trim())}”`)}</div>`;
+  h += list.slice(0, 60).map((r, i) => `<button class="res-row${i === searchActive ? " active" : ""}" role="option" data-res="${i}">${r.icon}<span style="min-width:0"><b>${highlight(r.title, terms)}</b><small>${highlight(r.sub, terms)}</small></span></button>`).join("");
+  box.innerHTML = h;
+  box.hidden = document.activeElement !== $("#searchInput") && !box.matches(":hover");
+  render();
+}
+function centerOn(p) {
+  const r = svg.getBoundingClientRect();
+  if (!p || !r.width) return;
+  if (view.k < 0.6) view.k = 0.9;
+  view.x = r.width / 2 - p.x * view.k;
+  view.y = r.height / 2 - p.y * view.k;
+  applyView();
+}
+function chooseResult(i) {
+  const r = searchList[i];
+  if (!r) return;
+  sel = { kind: r.kind, id: r.id };
+  centerOn(r.at); render(); renderInspector();
+  $("#searchRes").hidden = true;
+}
+const searchInput = $("#searchInput");
+searchInput.addEventListener("input", () => { searchQ = searchInput.value; searchActive = 0; runSearch(); });
+searchInput.addEventListener("focus", () => { if (searchQ.trim()) $("#searchRes").hidden = false; });
+searchInput.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== searchInput) $("#searchRes").hidden = true; }, 150));
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    if (!searchList.length) return;
+    searchActive = (searchActive + (e.key === "ArrowDown" ? 1 : -1) + Math.min(searchList.length, 60)) % Math.min(searchList.length, 60);
+    for (const b of document.querySelectorAll(".res-row")) b.classList.toggle("active", +b.dataset.res === searchActive);
+    document.querySelector(".res-row.active")?.scrollIntoView({ block: "nearest" });
+  } else if (e.key === "Enter") { e.preventDefault(); chooseResult(searchActive); }
+  else if (e.key === "Escape") {
+    e.preventDefault(); e.stopPropagation();
+    if (searchInput.value) { searchInput.value = ""; searchQ = ""; runSearch(); } else searchInput.blur();
+  }
+});
+$("#searchRes").addEventListener("mousedown", (e) => e.preventDefault());
+$("#searchRes").addEventListener("click", (e) => { const b = e.target.closest("[data-res]"); if (b) chooseResult(+b.dataset.res); });
 
 /* ---------- Boot ---------- */
 function boot() {
@@ -1399,14 +1677,14 @@ function boot() {
   try { saved = JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) {}
   try { doc = saved && saved.doc ? normalize(saved.doc) : sample(); docId = saved?.docId || null; } catch (e) { doc = sample(); }
   $("#docTitle").value = doc.title;
-  buildPalette(); setMode("select"); renderInspector(); updateUndoButtons();
+  applyLang(); bindPalette(); setMode("select"); renderInspector(); updateUndoButtons();
   requestAnimationFrame(fit);
   window.addEventListener("resize", () => { if (!doc.nodes.length) return; });
   detectServer().then(async (ok) => {
     server = ok;
-    if (!ok) { setPill("บันทึกอัตโนมัติในเบราว์เซอร์นี้", false); return; }
+    if (!ok) { setPill(L("บันทึกอัตโนมัติในเบราว์เซอร์นี้", "Autosaved in this browser"), false); return; }
     $("#filesBtn").hidden = false;
-    setPill("เชื่อมต่อเซิร์ฟเวอร์แล้ว", true);
+    setPill(L("เชื่อมต่อเซิร์ฟเวอร์แล้ว", "Connected to server"), true);
     try {
       if (docId) {
         const r = await fetch("api/diagrams/" + encodeURIComponent(docId), { cache: "no-store" });
@@ -1419,7 +1697,7 @@ function boot() {
       } else {
         await createOnServer(doc, true);
       }
-    } catch (e) { setPill("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", false); }
+    } catch (e) { setPill(L("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server"), false); }
   });
 }
 boot();

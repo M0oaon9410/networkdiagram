@@ -12,6 +12,7 @@ const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "data
 const PUBLIC_DIR = path.join(__dirname, "public");
 const MAX_BODY = 5 * 1024 * 1024;
 const ID_RE = /^[a-z0-9-]{1,64}$/;
+const FONT_RE = /^[a-z0-9-]+\.(woff2|txt)$/;
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -112,6 +113,13 @@ const server = http.createServer(async (req, res) => {
     const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
     if (parts[0] === "api") return await api(req, res, parts);
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return send(res, 200, APP_HTML, "text/html; charset=utf-8");
+    if (req.method === "GET" && parts[0] === "fonts" && parts.length === 2 && FONT_RE.test(parts[1])) {
+      try {
+        const buf = await fsp.readFile(path.join(PUBLIC_DIR, "fonts", parts[1]));
+        res.writeHead(200, { "Content-Type": parts[1].endsWith(".woff2") ? "font/woff2" : "text/plain; charset=utf-8", "Content-Length": buf.length, "Cache-Control": "public, max-age=604800" });
+        return res.end(buf);
+      } catch (e) { return send(res, 404, "Not found", "text/plain; charset=utf-8"); }
+    }
     return send(res, 404, "Not found", "text/plain; charset=utf-8");
   } catch (e) {
     const status = e.status || (e instanceof SyntaxError ? 400 : 500);
