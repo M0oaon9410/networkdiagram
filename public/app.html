@@ -817,18 +817,58 @@ function routeOnce(l, starts, goals, used, pad) {
   }
   return out.length >= 2 ? out : null;
 }
-// Polyline through pts with each corner rounded by up to r.
-function roundedPath(pts, r) {
-  let d = `M${pts[0].x} ${pts[0].y}`;
-  for (let i = 1; i < pts.length - 1; i++) {
+// Polyline through pts with each corner rounded by up to r; hops[i] lists distances along
+// segment i where a small arc jumps over another link.
+const HOP_R = 6;
+function roundedPath(pts, r, hops) {
+  const n = pts.length, rr = [0];
+  for (let i = 1; i < n - 1; i++) {
     const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
-    const l1 = Math.hypot(p1.x - p0.x, p1.y - p0.y), l2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-    const rr = Math.min(r, l1 / 2, l2 / 2);
-    if (rr < 0.5) { d += ` L${p1.x} ${p1.y}`; continue; }
-    d += ` L${p1.x + (p0.x - p1.x) / l1 * rr} ${p1.y + (p0.y - p1.y) / l1 * rr} Q${p1.x} ${p1.y} ${p1.x + (p2.x - p1.x) / l2 * rr} ${p1.y + (p2.y - p1.y) / l2 * rr}`;
+    rr.push(Math.min(r, Math.hypot(p1.x - p0.x, p1.y - p0.y) / 2, Math.hypot(p2.x - p1.x, p2.y - p1.y) / 2));
   }
-  const last = pts[pts.length - 1];
-  return d + ` L${last.x} ${last.y}`;
+  rr.push(0);
+  const f = (v) => Math.round(v * 100) / 100;
+  let d = `M${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p = pts[i], q = pts[i + 1];
+    const L = Math.hypot(q.x - p.x, q.y - p.y);
+    if (L < 0.01) continue;
+    const ux = (q.x - p.x) / L, uy = (q.y - p.y) / L;
+    const at = (t) => `${f(p.x + ux * t)} ${f(p.y + uy * t)}`;
+    // horizontal runs hop upward, vertical runs hop to the right
+    const sweep = ux > 1e-6 || (Math.abs(ux) <= 1e-6 && uy > 0) ? 1 : 0;
+    const startT = rr[i] >= 0.5 ? rr[i] : 0, endT = L - (rr[i + 1] >= 0.5 ? rr[i + 1] : 0);
+    let last = startT;
+    for (const h of (hops && hops[i]) || []) {
+      if (h - HOP_R < last + 1 || h + HOP_R > endT - 1) continue;
+      d += ` L${at(h - HOP_R)} A${HOP_R} ${HOP_R} 0 0 ${sweep} ${at(h + HOP_R)}`;
+      last = h + HOP_R;
+    }
+    if (i + 1 < n - 1 && rr[i + 1] >= 0.5) {
+      const r1 = rr[i + 1], o = pts[i + 2];
+      const l2 = Math.hypot(o.x - q.x, o.y - q.y);
+      d += ` L${at(endT)} Q${q.x} ${q.y} ${f(q.x + (o.x - q.x) / l2 * r1)} ${f(q.y + (o.y - q.y) / l2 * r1)}`;
+    } else d += ` L${q.x} ${q.y}`;
+  }
+  return d;
+}
+// Distances along each segment of pts where it crosses a segment in segs (already drawn links).
+function linkHops(pts, segs) {
+  const hops = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i], q = pts[i + 1], rx = q.x - p.x, ry = q.y - p.y, L = Math.hypot(rx, ry);
+    const list = [];
+    for (const s of segs) {
+      const sx = s.b.x - s.a.x, sy = s.b.y - s.a.y, den = rx * sy - ry * sx;
+      if (Math.abs(den) < 1e-9) continue; // parallel runs never cross
+      const t = ((s.a.x - p.x) * sy - (s.a.y - p.y) * sx) / den;
+      const u = ((s.a.x - p.x) * ry - (s.a.y - p.y) * rx) / den;
+      if (t <= 0 || t >= 1 || u <= 0.02 || u >= 0.98) continue;
+      list.push(t * L);
+    }
+    hops.push(list.sort((a, b) => a - b));
+  }
+  return hops;
 }
 // Elbow links leave a zone through the side facing the other end, level with it where the side allows.
 function elbowAnchor(id, c, other, horiz) {
@@ -854,7 +894,7 @@ function diagramMarkup(opts = {}) {
     if (isSel && sel) out += `<rect data-kind="zone-resize" data-id="${z.id}" x="${z.x + z.w - 9}" y="${z.y + z.h - 9}" width="16" height="16" rx="3" fill="var(--panel)" stroke="${c}" stroke-width="2" style="cursor:nwse-resize"/>`;
   }
   // links
-  const pairs = {}, used = { h: new Map(), v: new Map() };
+  const pairs = {}, used = { h: new Map(), v: new Map() }, drawnSegs = [];
   for (const l of doc.links) { const k = [l.from, l.to].sort().join("|"); (pairs[k] ||= []).push(l.id); }
   for (const l of doc.links) {
     const ca = endCenter(l.from), cb = endCenter(l.to);
@@ -875,7 +915,8 @@ function diagramMarkup(opts = {}) {
       pts = [{ x: a.x + px * off, y: a.y + py * off }, { x: b.x + px * off, y: b.y + py * off }];
     }
     const P0 = pts[0], PN = pts[pts.length - 1];
-    const path = roundedPath(pts, 12);
+    const path = roundedPath(pts, 12, linkHops(pts, drawnSegs));
+    for (let i = 0; i < pts.length - 1; i++) drawnSegs.push({ a: pts[i], b: pts[i + 1] });
     const t = LINKS[l.kind] || LINKS.eth;
     const col = t.color || (exp ? "#6b7684" : "var(--link)");
     const isSel = !exp && sel && sel.kind === "link" && sel.id === l.id;
@@ -883,7 +924,7 @@ function diagramMarkup(opts = {}) {
     out += `<g data-kind="link" data-id="${l.id}"${lit ? "" : ' opacity=".15"'}>`;
     if (isSel) out += `<path d="${path}" fill="none" stroke="var(--sel)" stroke-opacity=".45" stroke-width="${t.width + 7}" stroke-linecap="round" stroke-linejoin="round"/>`;
     out += `<path d="${path}" fill="none" stroke="${col}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round"/>`;
-    if (!exp) out += `<path class="hit" d="${path}"/>`;
+    if (!exp) out += `<path class="hit" d="${roundedPath(pts, 12)}"/>`;
     if (aZone) out += `<circle cx="${P0.x}" cy="${P0.y}" r="4.5" fill="${col}"/>`;
     if (bZone) out += `<circle cx="${PN.x}" cy="${PN.y}" r="4.5" fill="${col}"/>`;
     // keep text clear of the tile and of the name/IP printed below each node; a zone end only needs a small gap
