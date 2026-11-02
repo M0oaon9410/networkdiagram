@@ -17,6 +17,14 @@ const FONT_RE = /^[a-z0-9-]+\.(woff2|txt)$/;
 // Login is on unless AUTH=off (then anyone who can reach the port may edit, as before).
 const AUTH_ON = !/^(0|off|false|no)$/i.test(process.env.AUTH || "");
 const CAN_EDIT = ["admin", "editor"];
+const CAN_VIEW = ["admin", "editor", "viewer"];
+// Everything the page needs is served from here; no framing by other sites; tokens in URLs never leak via Referer.
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+};
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const auth = AUTH_ON ? createAuth({ dataDir: DATA_DIR }) : null;
@@ -31,9 +39,9 @@ const APP_HTML =
   "</body></html>";
 
 function send(res, status, body, type = "application/json; charset=utf-8") {
-  if (status === 204) { res.writeHead(204, { "Cache-Control": "no-store" }); return res.end(); }
+  if (status === 204) { res.writeHead(204, { "Cache-Control": "no-store", ...SECURITY_HEADERS }); return res.end(); }
   const buf = Buffer.isBuffer(body) ? body : Buffer.from(typeof body === "string" ? body : JSON.stringify(body));
-  res.writeHead(status, { "Content-Type": type, "Content-Length": buf.length, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+  res.writeHead(status, { "Content-Type": type, "Content-Length": buf.length, "Cache-Control": "no-store", ...SECURITY_HEADERS });
   res.end(buf);
 }
 
@@ -118,6 +126,7 @@ async function api(req, res, parts) {
       if (parts[1] === "settings" && parts[2] === "test" && req.method === "POST") return reply(await auth.testMail(me));
       return send(res, 404, { error: "not found" });
     }
+    if (!CAN_VIEW.includes(me.role)) return send(res, 403, { error: "pending" });
     if (req.method !== "GET" && !CAN_EDIT.includes(me.role)) return send(res, 403, { error: "read_only" });
   }
   if (parts[1] !== "diagrams" || parts.length > 3) return send(res, 404, { error: "not found" });
@@ -161,7 +170,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return send(res, 200, APP_HTML, "text/html; charset=utf-8");
     if (req.method === "GET" && url.pathname === "/verify" && AUTH_ON) {
       const ok = await auth.verify(url.searchParams.get("token") || "");
-      res.writeHead(302, { Location: "/?verified=" + (ok ? "1" : "0"), "Cache-Control": "no-store" });
+      res.writeHead(302, { Location: "/?verified=" + (ok ? "1" : "0"), "Cache-Control": "no-store", ...SECURITY_HEADERS });
       return res.end();
     }
     if (req.method === "GET" && parts[0] === "fonts" && parts.length === 2 && FONT_RE.test(parts[1])) {

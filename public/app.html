@@ -579,19 +579,29 @@ function endAnchor(id, toward) {
 function normalize(d) {
   if (!d || typeof d !== "object" || !Array.isArray(d.nodes)) throw new Error(L("ไม่พบรายการอุปกรณ์ (nodes) ในไฟล์", "No devices (nodes) found in the file"));
   const out = { version: 1, title: String(d.title || L("ผังเครือข่าย", "Network diagram")), nodes: [], links: [], zones: [] };
+  // ids end up inside HTML attributes, so anything but plain letters, digits, - and _ gets a fresh id
+  const idMap = new Map(), taken = new Set();
+  const safeId = (raw, prefix) => {
+    let id = typeof raw === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(raw) && !taken.has(raw) ? raw : uid(prefix);
+    while (taken.has(id)) id = uid(prefix);
+    taken.add(id);
+    if (raw != null && !idMap.has(String(raw))) idMap.set(String(raw), id);
+    return id;
+  };
   for (const n of d.nodes) {
     if (!n || !n.id) continue;
     out.nodes.push({ name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", os: "", location: "", status: "active", notes: "",
-      ...n, type: TYPES[n.type] ? n.type : "server", x: +n.x || 0, y: +n.y || 0, extra: { ...(n.extra || {}) }, custom: Array.isArray(n.custom) ? n.custom.map((c) => ({ k: String(c.k ?? ""), v: String(c.v ?? "") })) : [] });
+      ...n, type: TYPES[n.type] ? n.type : "server", x: +n.x || 0, y: +n.y || 0, extra: { ...(n.extra || {}) }, custom: Array.isArray(n.custom) ? n.custom.map((c) => ({ k: String(c.k ?? ""), v: String(c.v ?? "") })) : [], id: safeId(n.id, "n") });
   }
   for (const z of d.zones || []) {
     if (!z) continue;
-    out.zones.push({ name: "", notes: "", ...z, id: z.id || uid("z"), x: +z.x || 0, y: +z.y || 0, w: Math.max(60, +z.w || 200), h: Math.max(40, +z.h || 120), color: ZONE_COLORS[z.color] || HEX_RE.test(z.color || "") ? z.color : "blue" });
+    out.zones.push({ name: "", notes: "", ...z, id: safeId(z.id, "z"), x: +z.x || 0, y: +z.y || 0, w: Math.max(60, +z.w || 200), h: Math.max(40, +z.h || 120), color: ZONE_COLORS[z.color] || HEX_RE.test(z.color || "") ? z.color : "blue" });
   }
-  const ids = new Set([...out.nodes.map((n) => n.id), ...out.zones.map((z) => z.id)]);
   for (const l of d.links || []) {
-    if (!l || !ids.has(l.from) || !ids.has(l.to) || l.from === l.to) continue;
-    const nl = { label: "", fromPort: "", toPort: "", notes: "", ...l, id: l.id || uid("l"), kind: LINKS[l.kind] ? l.kind : "eth" };
+    if (!l) continue;
+    const from = idMap.get(String(l.from)), to = idMap.get(String(l.to));
+    if (!from || !to || from === to) continue;
+    const nl = { label: "", fromPort: "", toPort: "", notes: "", ...l, from, to, id: safeId(l.id, "l"), kind: LINKS[l.kind] ? l.kind : "eth" };
     const bends = Array.isArray(l.bends) ? l.bends.filter((p) => p && isFinite(+p.x) && isFinite(+p.y)).map((p) => ({ x: +p.x, y: +p.y })) : [];
     if (bends.length) { nl.bends = bends; nl.firstH = !!l.firstH; } else { delete nl.bends; delete nl.firstH; }
     out.links.push(nl);
@@ -2027,9 +2037,9 @@ $("#searchRes").addEventListener("click", (e) => { const b = e.target.closest("[
 /* ---------- Accounts ----------
    Only when the server has login turned on: sign-in / sign-up / password reset screen,
    the account menu, and the administrator's user and e-mail settings. */
-const roleLabel = (r) => ({ admin: L("ผู้ดูแลระบบ", "Admin"), editor: L("ผู้แก้ไข", "Editor"), viewer: L("ดูอย่างเดียว", "Viewer") }[r] || r);
-const roleHelp = () => L("ผู้ดูแลระบบ: ทำได้ทุกอย่างและจัดการผู้ใช้ · ผู้แก้ไข: เพิ่ม ลบ แก้ไขผังได้ · ดูอย่างเดียว: เปิดดูและส่งออกได้ แต่แก้ไขไม่ได้",
-  "Admin: everything, including managing users · Editor: add, delete and edit diagrams · Viewer: open and export only");
+const roleLabel = (r) => ({ admin: L("ผู้ดูแลระบบ", "Admin"), editor: L("ผู้แก้ไข", "Editor"), viewer: L("ดูอย่างเดียว", "Viewer"), pending: L("รออนุมัติ", "Waiting for approval") }[r] || r);
+const roleHelp = () => L("ผู้ดูแลระบบ: ทำได้ทุกอย่างและจัดการผู้ใช้ · ผู้แก้ไข: เพิ่ม ลบ แก้ไขผังได้ · ดูอย่างเดียว: เปิดดูและส่งออกได้ แต่แก้ไขไม่ได้ · รออนุมัติ: เข้าสู่ระบบได้แต่ยังมองไม่เห็นผัง (ค่าเริ่มต้นของคนที่สมัครใหม่)",
+  "Admin: everything, including managing users · Editor: add, delete and edit diagrams · Viewer: open and export only · Waiting for approval: can sign in but sees no diagrams (the default for new sign-ups)");
 const AUTH_ERRORS = {
   bad_login: ["อีเมลหรือรหัสผ่านไม่ถูกต้อง", "Wrong e-mail or password."],
   unverified: ["บัญชีนี้ยังไม่ได้ยืนยันอีเมล กรุณากดลิงก์ในอีเมลที่ส่งไปก่อน", "This account's e-mail is not verified yet. Please click the link we sent."],
@@ -2074,7 +2084,7 @@ function renderAuth() {
     h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="forgot">${L("ลืมรหัสผ่าน", "Forgot password?")}</button><button class="linkbtn" type="button" data-go="register">${L("สมัครสมาชิก", "Create an account")}</button></div>`;
   } else if (view === "register") {
     h += `<h1>${L("สมัครสมาชิก", "Create an account")}</h1>`;
-    h += `<p class="muted">${authView.first ? L("ยังไม่มีผู้ใช้ในระบบ บัญชีแรกที่สมัครจะเป็นผู้ดูแลระบบ (admin) และใช้งานได้ทันที", "There are no users yet. The first account becomes the administrator and works right away.") : L("หลังสมัคร ระบบจะส่งลิงก์ยืนยันไปที่อีเมลของคุณ บัญชีใหม่จะดูผังได้อย่างเดียวจนกว่าผู้ดูแลระบบจะเพิ่มสิทธิ์", "We'll e-mail you a link to verify your address. New accounts can view only until an admin grants more rights.")}</p>${noteHtml(note)}`;
+    h += `<p class="muted">${authView.first ? L("ยังไม่มีผู้ใช้ในระบบ บัญชีแรกที่สมัครจะเป็นผู้ดูแลระบบ (admin) และใช้งานได้ทันที", "There are no users yet. The first account becomes the administrator and works right away.") : L("หลังสมัคร ระบบจะส่งลิงก์ยืนยันไปที่อีเมลของคุณ จากนั้นผู้ดูแลระบบต้องอนุมัติก่อนจึงจะเห็นผังได้", "We'll e-mail you a link to verify your address. An admin then has to approve the account before you can see diagrams.")}</p>${noteHtml(note)}`;
     h += `<form data-form="register">${f("a_name", L("ชื่อ-นามสกุล", "Full name"), "text", "name")}${f("a_email", L("อีเมล", "E-mail"), "email", "email", email)}${f("a_pass", L("รหัสผ่าน (อย่างน้อย 8 ตัว)", "Password (8+ characters)"), "password", "new-password")}${f("a_pass2", L("ยืนยันรหัสผ่าน", "Confirm password"), "password", "new-password")}<button class="btn primary">${L("สมัครสมาชิก", "Create account")}</button></form>`;
     h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="login">${L("มีบัญชีแล้ว? เข้าสู่ระบบ", "Have an account? Sign in")}</button></div>`;
   } else if (view === "forgot") {
@@ -2085,6 +2095,9 @@ function renderAuth() {
     h += `<h1>${L("ตั้งรหัสผ่านใหม่", "Set a new password")}</h1>${noteHtml(note)}`;
     h += `<form data-form="reset">${f("a_pass", L("รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)", "New password (8+ characters)"), "password", "new-password")}${f("a_pass2", L("ยืนยันรหัสผ่านใหม่", "Confirm new password"), "password", "new-password")}<button class="btn primary">${L("บันทึกรหัสผ่าน", "Save password")}</button></form>`;
     h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="login">${L("กลับไปหน้าเข้าสู่ระบบ", "Back to sign in")}</button></div>`;
+  } else if (view === "pending") {
+    h += `<h1>${L("รอผู้ดูแลระบบอนุมัติ", "Waiting for approval")}</h1><p>${L(`บัญชี ${esc(me ? me.email : "")} ยืนยันอีเมลแล้ว แต่ผู้ดูแลระบบยังไม่ได้กำหนดสิทธิ์ให้ กรุณาแจ้งผู้ดูแลระบบ แล้วกลับมาโหลดหน้านี้ใหม่`, `${esc(me ? me.email : "")} is verified, but an admin hasn't given it access yet. Please ask an admin, then reload this page.`)}</p>`;
+    h += `<button class="btn primary" type="button" data-go="reload">${L("โหลดใหม่", "Reload")}</button><div class="auth-links"><button class="linkbtn" type="button" data-go="logout">${L("ออกจากระบบ", "Sign out")}</button></div>`;
   } else {
     h += `<h1>${L("ตรวจสอบอีเมลของคุณ", "Check your e-mail")}</h1>${noteHtml(note)}<button class="btn primary" type="button" data-go="login">${L("ไปหน้าเข้าสู่ระบบ", "Go to sign in")}</button>`;
   }
@@ -2097,6 +2110,8 @@ $("#authCard").addEventListener("click", async (e) => {
   if (lb) { setLang(lb.dataset.alang); return; }
   const g = e.target.closest("[data-go]"); if (!g) return;
   const email = $("#a_email")?.value.trim() || authView.email;
+  if (g.dataset.go === "reload") { location.reload(); return; }
+  if (g.dataset.go === "logout") { await postJson("auth/logout", {}); try { localStorage.removeItem(LS_KEY); } catch (err) {} location.replace(location.pathname); return; }
   if (g.dataset.go === "resend") {
     const r = await postJson("auth/resend", { email });
     showAuth("login", r.ok ? (r.j.mailReady ? { th: "ส่งอีเมลยืนยันใหม่แล้ว กรุณาตรวจสอบกล่องจดหมาย (และโฟลเดอร์สแปม)", en: "We sent a new verification e-mail. Check your inbox (and spam folder).", kind: "ok" } : { th: "ระบบยังไม่ได้ตั้งค่าการส่งอีเมล กรุณาติดต่อผู้ดูแลระบบให้ยืนยันบัญชีให้", en: "E-mail sending isn't set up yet. Please ask an admin to verify your account.", kind: "err" }) : errNote(r.j.error), { email });
@@ -2195,7 +2210,7 @@ async function openUsers() {
     if (!a.ok || !b.ok) throw new Error();
     list = await a.json(); cfg = await b.json();
   } catch (err) { box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(errNote("network"))}<div class="actions"><div class="spacer"></div><button class="btn" data-close>${L("ปิด", "Close")}</button></div>`; return; }
-  const roleSel = (u) => `<select class="sel-sm" data-urole="${esc(u.id)}" aria-label="${L("สิทธิ์ของ", "Role of")} ${esc(u.name)}">${["admin", "editor", "viewer"].map((r) => `<option value="${r}"${u.role === r ? " selected" : ""}>${esc(roleLabel(r))}</option>`).join("")}</select>`;
+  const roleSel = (u) => `<select class="sel-sm" data-urole="${esc(u.id)}" aria-label="${L("สิทธิ์ของ", "Role of")} ${esc(u.name)}">${["admin", "editor", "viewer", "pending"].map((r) => `<option value="${r}"${u.role === r ? " selected" : ""}>${esc(roleLabel(r))}</option>`).join("")}</select>`;
   const rows = list.map((u) => `<div class="user-row"><div><b>${esc(u.name)}${u.id === me.id ? L(" (คุณ)", " (you)") : ""}</b><small>${esc(u.email)} · ${u.verified ? L("ยืนยันอีเมลแล้ว", "verified") : L("รอยืนยันอีเมล", "waiting for e-mail verification")}${u.lastLogin ? " · " + L("เข้าล่าสุด ", "last sign-in ") + esc(new Date(u.lastLogin).toLocaleString(L("th-TH", "en-GB"))) : ""}</small></div>`
     + `<div class="grp">${roleSel(u)}${u.verified ? "" : `<button class="btn" data-uverify="${esc(u.id)}">${L("ยืนยันให้", "Verify")}</button>`}</div>`
     + (u.id === me.id ? "<span></span>" : `<button class="btn danger" data-udel="${esc(u.id)}">${L("ลบ", "Delete")}</button>`) + `</div>`).join("");
@@ -2282,6 +2297,7 @@ function boot() {
         return showAuth("login", vNote);
       }
       me = await r.json();
+      if (me.role === "pending") return showAuth("pending");
       applyRole();
       if (vNote) toast(L(vNote.th, vNote.en));
     }
