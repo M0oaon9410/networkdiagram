@@ -196,6 +196,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .title-input { width: 100%; order: 10; }
   .hide-sm { display: none; }
 }
+.seggrip { fill: var(--panel); stroke: var(--sel); stroke-width: 2; }
+.seggrip:hover { fill: var(--sel); }
 /* sign-in screen, account menu, read-only mode */
 .auth { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: grid; place-items: center; padding: 16px; overflow-y: auto; }
 .auth-card { width: min(400px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px; display: grid; gap: 14px; }
@@ -589,7 +591,10 @@ function normalize(d) {
   const ids = new Set([...out.nodes.map((n) => n.id), ...out.zones.map((z) => z.id)]);
   for (const l of d.links || []) {
     if (!l || !ids.has(l.from) || !ids.has(l.to) || l.from === l.to) continue;
-    out.links.push({ label: "", fromPort: "", toPort: "", notes: "", ...l, id: l.id || uid("l"), kind: LINKS[l.kind] ? l.kind : "eth" });
+    const nl = { label: "", fromPort: "", toPort: "", notes: "", ...l, id: l.id || uid("l"), kind: LINKS[l.kind] ? l.kind : "eth" };
+    const bends = Array.isArray(l.bends) ? l.bends.filter((p) => p && isFinite(+p.x) && isFinite(+p.y)).map((p) => ({ x: +p.x, y: +p.y })) : [];
+    if (bends.length) { nl.bends = bends; nl.firstH = !!l.firstH; } else { delete nl.bends; delete nl.firstH; }
+    out.links.push(nl);
   }
   return out;
 }
@@ -751,6 +756,63 @@ function routeEnds(id, c, other, otherId) {
     { a: { x: ax, y: z.y }, p: { x: ax, y: z.y - R_STUB }, dir: 3, face: other.y < z.y },
   ];
   return sides.map((s) => ({ p: s.p, dir: s.dir, pre: [s.a], cost: s.face ? 0 : 60 }));
+}
+/* Hand-adjusted elbow links keep their bend points in l.bends; l.firstH says whether the first
+   segment is horizontal (segments alternate). The bends next to each end slide to stay level with it. */
+const routeCache = {};           // link id -> points last drawn, for dragging segments
+function manualRoute(l) {
+  const bs = l.bends.map((p) => ({ x: p.x, y: p.y })), k = bs.length;
+  if (!k) return null;
+  const segH = (j) => (j % 2 === 0) === !!l.firstH;
+  const end = (id, toward, horiz) => { const n = findNode(id); if (n) return { x: n.x, y: n.y }; const c = endCenter(id); if (!c) return null; const a = elbowAnchor(id, c, toward, horiz); return { x: a.x, y: a.y }; };
+  const A = end(l.from, bs[0], segH(0)), B = end(l.to, bs[k - 1], segH(k));
+  if (!A || !B) return null;
+  if (segH(0)) bs[0].y = A.y; else bs[0].x = A.x;
+  if (segH(k)) bs[k - 1].y = B.y; else bs[k - 1].x = B.x;
+  return [A, ...bs, B];
+}
+// Drop repeated points and bends that sit on a straight run.
+function cleanPts(pts) {
+  const out = [];
+  for (const p of pts) if (!out.length || Math.hypot(p.x - out[out.length - 1].x, p.y - out[out.length - 1].y) > 0.5) out.push({ x: p.x, y: p.y });
+  if (out.length < 2) return out;
+  if (Math.hypot(out[out.length - 1].x - pts[pts.length - 1].x, out[out.length - 1].y - pts[pts.length - 1].y) > 0.5) out.push({ ...pts[pts.length - 1] });
+  for (let i = out.length - 2; i >= 1; i--) {
+    const a = out[i - 1], b = out[i], c = out[i + 1];
+    if ((Math.abs(a.x - b.x) < 0.5 && Math.abs(b.x - c.x) < 0.5) || (Math.abs(a.y - b.y) < 0.5 && Math.abs(b.y - c.y) < 0.5)) out.splice(i, 1);
+  }
+  return out;
+}
+const isH = (a, b) => Math.abs(a.y - b.y) < 0.5;
+function storeBends(l, pts) {
+  const c = cleanPts(pts);
+  if (c.length < 3) { delete l.bends; delete l.firstH; return; }
+  l.bends = c.slice(1, -1).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }));
+  l.firstH = isH(c[0], c[1]);
+}
+// Start dragging the segment of link l nearest to p. Segments touching a device get a short
+// stub first, so the line still leaves the device where it did while the rest of the run moves.
+function startSegDrag(l, p) {
+  const pts = cleanPts(routeCache[l.id] || []);
+  if (pts.length < 2) return null;
+  let i = 0, best = Infinity;
+  for (let j = 0; j < pts.length - 1; j++) {
+    const a = pts[j], b = pts[j + 1];
+    const d = isH(a, b) ? (p.x >= Math.min(a.x, b.x) - 6 && p.x <= Math.max(a.x, b.x) + 6 ? Math.abs(p.y - a.y) : Infinity)
+      : (p.y >= Math.min(a.y, b.y) - 6 && p.y <= Math.max(a.y, b.y) + 6 ? Math.abs(p.x - a.x) : Infinity);
+    if (d < best) { best = d; i = j; }
+  }
+  const horiz = isH(pts[i], pts[i + 1]);
+  if (!horiz && Math.abs(pts[i].x - pts[i + 1].x) > 0.5) return null;   // not a right-angle segment
+  const stub = (a, b) => { const L = Math.hypot(b.x - a.x, b.y - a.y) || 1, s = Math.min(40, L / 2); return { x: a.x + (b.x - a.x) / L * s, y: a.y + (b.y - a.y) / L * s }; };
+  const base = pts.map((q) => ({ ...q }));
+  // a zone end can slide along the zone's border instead
+  let mi = i, needEnd = i === pts.length - 2 && !findZone(l.to);
+  const needStart = i === 0 && !findZone(l.from);
+  if (!needStart && !needEnd && i === 0 && pts.length === 2) needEnd = true;
+  if (needEnd) { const t = stub(base[i + 1], base[i]); base.splice(i + 1, 0, { ...t }, { ...t }); }
+  if (needStart) { const t = stub(base[0], base[1]); base.splice(1, 0, { ...t }, { ...t }); mi += 2; }
+  return { type: "seg", id: l.id, base, mi, horiz, c0: horiz ? base[mi].y : base[mi].x, px: p.x, py: p.y, before: JSON.stringify(doc), moved: false };
 }
 function routeElbow(l, ca, cb, used) {
   const starts = routeEnds(l.from, ca, cb, l.to), goals = routeEnds(l.to, cb, ca, l.from);
@@ -959,7 +1021,7 @@ function diagramMarkup(opts = {}) {
     const elbow = l.route === "elbow";
     let pts, aZone, bZone;
     if (elbow) {
-      pts = routeElbow(l, ca, cb, used) || simpleElbow(l, ca, cb, off);
+      pts = (l.bends && manualRoute(l)) || routeElbow(l, ca, cb, used) || simpleElbow(l, ca, cb, off);
       aZone = !!findZone(l.from); bZone = !!findZone(l.to);
       markUsed(used, pts);
     } else {
@@ -968,6 +1030,7 @@ function diagramMarkup(opts = {}) {
       const len = Math.hypot(b.x - a.x, b.y - a.y) || 1, px = -(b.y - a.y) / len, py = (b.x - a.x) / len;
       pts = [{ x: a.x + px * off, y: a.y + py * off }, { x: b.x + px * off, y: b.y + py * off }];
     }
+    if (!exp) routeCache[l.id] = pts;
     const P0 = pts[0], PN = pts[pts.length - 1];
     const path = roundedPath(pts, 12, linkHops(pts, drawnSegs));
     for (let i = 0; i < pts.length - 1; i++) drawnSegs.push({ a: pts[i], b: pts[i + 1] });
@@ -1025,6 +1088,18 @@ function diagramMarkup(opts = {}) {
     const sub = n.ip || (n.vlan ? "VLAN " + n.vlan : "");
     if (sub) out += `<text class="nip" y="59" text-anchor="middle">${esc(sub)}</text>`;
     out += `</g>`;
+  }
+  // grips on the selected right-angle link: drag one (or the line itself) to shift that run
+  const sl = !exp && canEdit && sel && sel.kind === "link" && findLink(sel.id);
+  if (sl && sl.route === "elbow" && routeCache[sl.id]) {
+    const pts = cleanPts(routeCache[sl.id]);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1], h = isH(a, b);
+      if (!h && Math.abs(a.x - b.x) > 0.5) continue;
+      if (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < 30) continue;
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, w = h ? 22 : 10, ht = h ? 10 : 22;
+      out += `<rect class="seggrip" data-kind="seg" data-id="${sl.id}" x="${mx - w / 2}" y="${my - ht / 2}" width="${w}" height="${ht}" rx="4" style="cursor:${h ? "ns-resize" : "ew-resize"}"/>`;
+    }
   }
   return out;
 }
@@ -1260,11 +1335,14 @@ function renderInspector() {
     h += `<div class="fields">`;
     h += field(L("ชนิดสาย", "Cable type"), "kind", l.kind, { type: "select", options: Object.entries(LINKS).map(([k, v]) => [k, v.label]) });
     h += field(L("รูปแบบเส้น", "Line style"), "route", l.route === "elbow" ? "elbow" : "straight", { type: "select", options: [["straight", L("เส้นตรง", "Straight")], ["elbow", L("เส้นหักมุม", "Right-angle")]] });
+    h += `<p class="muted f full" style="margin:0;font-size:12.5px;line-height:1.5">${l.route === "elbow"
+      ? (l.bends ? L("ปรับแนวเส้นเองอยู่ ลากช่วงของเส้นเพื่อเลื่อนต่อ หรือกดปุ่มด้านล่างเพื่อให้ระบบหาเส้นทางให้ใหม่", "Hand-routed. Drag a run of the line to shift it, or use the button below to route it automatically again.") : L("ลากช่วงใดของเส้นเพื่อเลื่อนแนวเส้นเองได้", "Drag any run of the line to shift it by hand."))
+      : L("เปลี่ยนเป็นเส้นหักมุมเพื่อลากปรับแนวเส้นเองได้", "Switch to right-angle to adjust the path by dragging.")}</p>`;
     h += field(L("ป้ายบนสาย (ความเร็ว, VLAN)", "Label (speed, VLAN)"), "label", l.label, { full: true, ph: "1G, Trunk VLAN 10–40" });
     h += field(L("พอร์ตฝั่ง ", "Port on ") + (a.name || "A"), "fromPort", l.fromPort, { ph: "Gi1/0/1" });
     h += field(L("พอร์ตฝั่ง ", "Port on ") + (b.name || "B"), "toPort", l.toPort, { ph: "port1" });
     h += field("หมายเหตุ", "notes", l.notes, { type: "textarea", full: true });
-    h += `</div><div class="actions"><button class="btn" id="swapBtn">${L("สลับฝั่ง", "Swap ends")}</button><button class="btn danger" id="delBtn">${L("ลบสาย", "Delete link")}</button></div>`;
+    h += `</div><div class="actions">${l.bends && l.route === "elbow" ? `<button class="btn" id="autoRouteBtn">${L("จัดแนวเส้นอัตโนมัติ", "Auto-route again")}</button>` : ""}<button class="btn" id="swapBtn">${L("สลับฝั่ง", "Swap ends")}</button><button class="btn danger" id="delBtn">${L("ลบสาย", "Delete link")}</button></div>`;
   } else if (sel && sel.kind === "zone") {
     const z = findZone(sel.id);
     const inside = doc.nodes.filter((n) => n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h);
@@ -1384,7 +1462,9 @@ inspector.addEventListener("click", (e) => {
   if (b.id === "addCustom") { checkpoint(); findNode(sel.id).custom.push({ k: "", v: "" }); renderInspector(); const ins = inspector.querySelectorAll("#customRows input[data-part=k]"); ins[ins.length - 1]?.focus(); persist(); return; }
   if (b.dataset.customDel != null) { checkpoint(); findNode(sel.id).custom.splice(+b.dataset.customDel, 1); renderInspector(); persist(); return; }
   if (b.dataset.gotoLink) { sel = { kind: "link", id: b.dataset.gotoLink }; render(); renderInspector(); return; }
-  if (b.id === "swapBtn") { checkpoint(); const l = findLink(sel.id); [l.from, l.to] = [l.to, l.from]; [l.fromPort, l.toPort] = [l.toPort, l.fromPort]; render(); renderInspector(); persist(); return; }
+  if (b.id === "autoRouteBtn") { checkpoint(); const l = findLink(sel.id); delete l.bends; delete l.firstH; render(); renderInspector(); persist(); return; }
+  if (b.id === "swapBtn") { checkpoint(); const l = findLink(sel.id); [l.from, l.to] = [l.to, l.from]; [l.fromPort, l.toPort] = [l.toPort, l.fromPort];
+    if (l.bends) { l.firstH = (l.bends.length % 2 === 0) === !!l.firstH; l.bends.reverse(); } render(); renderInspector(); persist(); return; }
   if (b.id === "connectFromBtn") { const id = sel.id; setMode("connect"); pendingFrom = id; render(); return; }
 });
 
@@ -1453,11 +1533,16 @@ function groupMembers() {
       for (const n of doc.nodes) if (n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h) nodeIds.add(n.id);
     }
   }
-  return { nodes: [...nodeIds].map((id) => { const n = findNode(id); return [n, n.x, n.y]; }), zones: zoneIds.map((id) => { const z = findZone(id); return [z, z.x, z.y]; }) };
+  return { nodes: [...nodeIds].map((id) => { const n = findNode(id); return [n, n.x, n.y]; }), zones: zoneIds.map((id) => { const z = findZone(id); return [z, z.x, z.y]; }), links: bentLinks(new Set([...nodeIds, ...zoneIds])) };
+}
+// Hand-routed links with both ends among `ids`, with their bends as they are now.
+function bentLinks(ids) {
+  return doc.links.filter((l) => l.bends && ids.has(l.from) && ids.has(l.to)).map((l) => [l, l.bends.map((p) => ({ ...p }))]);
 }
 function moveGroup(g, dx, dy) {
   for (const [n, x, y] of g.nodes) { n.x = x + dx; n.y = y + dy; }
   for (const [z, x, y] of g.zones) { z.x = x + dx; z.y = y + dy; }
+  for (const [l, bs] of g.links || []) l.bends = bs.map((p) => ({ x: p.x + dx, y: p.y + dy }));
 }
 svg.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 && e.pointerType === "mouse") return;
@@ -1507,7 +1592,10 @@ svg.addEventListener("pointerdown", (e) => {
     const z = findZone(id);
     sel = { kind: "zone", id }; renderInspector();
     const inside = doc.nodes.filter((n) => n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h).map((n) => n.id);
-    drag = { type: "zone", id, lx: p.x, ly: p.y, sx: z.x, sy: z.y, inside, start: inside.map((nid) => { const n = findNode(nid); return [n.x, n.y]; }), px: p.x, py: p.y, before: JSON.stringify(doc), moved: false };
+    drag = { type: "zone", id, lx: p.x, ly: p.y, sx: z.x, sy: z.y, inside, start: inside.map((nid) => { const n = findNode(nid); return [n.x, n.y]; }), links: bentLinks(new Set([...inside, id])), px: p.x, py: p.y, before: JSON.stringify(doc), moved: false };
+  } else if ((kind === "link" || kind === "seg") && mode === "select" && findLink(id)?.route === "elbow") {
+    if (!(sel && sel.kind === "link" && sel.id === id)) { sel = { kind: "link", id }; renderInspector(); }
+    drag = startSegDrag(findLink(id), p);
   } else if (kind === "link" && mode === "select") {
     sel = { kind: "link", id }; renderInspector();
   } else {
@@ -1529,9 +1617,18 @@ svg.addEventListener("pointermove", (e) => {
     const z = findZone(drag.id), dx = snap(p.x - drag.px), dy = snap(p.y - drag.py);
     z.x = drag.sx + dx; z.y = drag.sy + dy;
     drag.inside.forEach((nid, i) => { const n = findNode(nid); n.x = drag.start[i][0] + dx; n.y = drag.start[i][1] + dy; });
+    for (const [l, bs] of drag.links) l.bends = bs.map((q) => ({ x: q.x + dx, y: q.y + dy }));
     drag.moved = true;
   } else if (drag.type === "resize") {
     const z = findZone(drag.id); z.w = Math.max(80, snap(p.x - z.x)); z.h = Math.max(50, snap(p.y - z.y)); drag.moved = true;
+  } else if (drag.type === "seg") {
+    const l = findLink(drag.id), v = snap(drag.c0 + (drag.horiz ? p.y - drag.py : p.x - drag.px));
+    const pts = drag.base.map((q) => ({ ...q })), ax = drag.horiz ? "y" : "x";
+    pts[drag.mi][ax] = v; pts[drag.mi + 1][ax] = v;
+    if (v !== drag.c0 || drag.moved) {
+      l.bends = pts.slice(1, -1); l.firstH = isH(drag.base[0], drag.base[1]);
+      drag.moved = true;
+    }
   } else if (drag.type === "link") { drag.cx = p.x; drag.cy = p.y; }
   else if (drag.type === "newzone") { drag.x1 = snap(p.x); drag.y1 = snap(p.y); }
   render();
@@ -1548,7 +1645,12 @@ function endDrag(e) {
     }
     setSelection(ks); renderInspector();
   }
-  if ((d.type === "node" || d.type === "zone" || d.type === "resize" || d.type === "group") && d.moved) {
+  if (d.type === "seg" && d.moved) {
+    const l = findLink(d.id), pts = manualRoute(l);
+    if (pts) storeBends(l, pts);
+    renderInspector();
+  }
+  if ((d.type === "node" || d.type === "zone" || d.type === "resize" || d.type === "group" || d.type === "seg") && d.moved) {
     undoStack.push(d.before); redoStack = []; updateUndoButtons(); persist();
   } else if (d.type === "link") {
     const el = document.elementFromPoint(e.clientX, e.clientY);
