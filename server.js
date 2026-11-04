@@ -7,6 +7,7 @@ const fsp = fs.promises;
 const path = require("path");
 const crypto = require("crypto");
 const { createAuth } = require("./lib/auth");
+const { createAudit } = require("./lib/audit");
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "data"));
@@ -27,7 +28,8 @@ const SECURITY_HEADERS = {
 };
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
-const auth = AUTH_ON ? createAuth({ dataDir: DATA_DIR }) : null;
+const audit = createAudit({ dataDir: DATA_DIR });
+const auth = AUTH_ON ? createAuth({ dataDir: DATA_DIR, audit }) : null;
 
 // app.html holds the page content only; wrap it in a document skeleton once at startup.
 const APP_HTML =
@@ -114,15 +116,20 @@ async function api(req, res, parts) {
       if (parts[2] === "password" && req.method === "POST") return reply(await auth.changePassword(req, me, await readJson(req)));
       return send(res, 404, { error: "not found" });
     }
+    if (parts[1] === "audit" && parts.length === 2 && req.method === "GET") {
+      if (me.role !== "admin") return send(res, 403, { error: "admin_only" });
+      const q = new URL(req.url, "http://x").searchParams;
+      return send(res, 200, await audit.query(Object.fromEntries(q)));
+    }
     if (parts[1] === "users" || parts[1] === "settings") {
       if (me.role !== "admin") return send(res, 403, { error: "admin_only" });
       if (parts[1] === "users" && parts.length === 2 && req.method === "GET") return reply(auth.listUsers());
       if (parts[1] === "users" && parts.length === 3 && ID_RE.test(parts[2])) {
-        if (req.method === "PATCH") return reply(await auth.updateUser(me, parts[2], await readJson(req)));
-        if (req.method === "DELETE") return reply(await auth.deleteUser(me, parts[2]));
+        if (req.method === "PATCH") return reply(await auth.updateUser(req, me, parts[2], await readJson(req)));
+        if (req.method === "DELETE") return reply(await auth.deleteUser(req, me, parts[2]));
       }
       if (parts[1] === "settings" && parts.length === 2 && req.method === "GET") return reply(auth.getSettings(req));
-      if (parts[1] === "settings" && parts.length === 2 && req.method === "PUT") return reply(await auth.putSettings(req, await readJson(req)));
+      if (parts[1] === "settings" && parts.length === 2 && req.method === "PUT") return reply(await auth.putSettings(req, me, await readJson(req)));
       if (parts[1] === "settings" && parts[2] === "test" && req.method === "POST") return reply(await auth.testMail(me));
       return send(res, 404, { error: "not found" });
     }
@@ -139,6 +146,7 @@ async function api(req, res, parts) {
       if (!validDiagram(d)) return send(res, 400, { error: "invalid diagram" });
       const newId = crypto.randomBytes(6).toString("hex");
       await writeDiagram(newId, d, me);
+      audit.diagramCreated(req, me, newId, d);
       return send(res, 201, { id: newId });
     }
     return send(res, 405, { error: "method not allowed" });
@@ -152,11 +160,17 @@ async function api(req, res, parts) {
   if (req.method === "PUT") {
     const d = JSON.parse(await readBody(req));
     if (!validDiagram(d)) return send(res, 400, { error: "invalid diagram" });
+    let before = null;
+    try { before = JSON.parse(await fsp.readFile(fileFor(id), "utf8")); } catch (e) {}
     const rec = await writeDiagram(id, d, me);
+    if (before) audit.diagramSaved(req, me, id, before, d); else audit.diagramCreated(req, me, id, d);
     return send(res, 200, { id, updatedAt: rec.updatedAt });
   }
   if (req.method === "DELETE") {
+    let before = null;
+    try { before = JSON.parse(await fsp.readFile(fileFor(id), "utf8")); } catch (e) {}
     await fsp.rm(fileFor(id), { force: true });
+    if (before) audit.diagramDeleted(req, me, id, before);
     return send(res, 204, "");
   }
   return send(res, 405, { error: "method not allowed" });
@@ -169,7 +183,7 @@ const server = http.createServer(async (req, res) => {
     if (parts[0] === "api") return await api(req, res, parts);
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return send(res, 200, APP_HTML, "text/html; charset=utf-8");
     if (req.method === "GET" && url.pathname === "/verify" && AUTH_ON) {
-      const ok = await auth.verify(url.searchParams.get("token") || "");
+      const ok = await auth.verify(url.searchParams.get("token") || "", req);
       res.writeHead(302, { Location: "/?verified=" + (ok ? "1" : "0"), "Cache-Control": "no-store", ...SECURITY_HEADERS });
       return res.end();
     }
@@ -189,4 +203,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => console.log(`NetPlan running on http://localhost:${PORT} (data: ${DATA_DIR}, login ${AUTH_ON ? "on" : "off"})`));
-for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => server.close(() => process.exit(0)));
+// write any gathered diagram edits to the audit log before stopping
+for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { audit.flushAll().finally(() => server.close(() => process.exit(0))); setTimeout(() => process.exit(0), 3000).unref(); });

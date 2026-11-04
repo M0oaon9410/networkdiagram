@@ -235,6 +235,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .user-row b, .user-row small { display: block; overflow-wrap: anywhere; }
 .user-row small { color: var(--muted); font-size: 12px; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.audit-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.audit-list { display: grid; gap: 6px; }
+.audit-row { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 12px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.audit-row.bad { border-left: 3px solid var(--danger); }
+.audit-meta { display: grid; gap: 2px; align-content: start; }
+.audit-meta span, .audit-meta small { color: var(--muted); overflow-wrap: anywhere; }
+.audit-meta b { font-weight: 600; }
+.audit-what { overflow-wrap: anywhere; line-height: 1.55; }
+.audit-what ul { margin: 4px 0 0; padding-left: 18px; }
+.audit-what details summary { cursor: pointer; color: var(--accent); margin-top: 4px; }
+@media (max-width: 720px) { .audit-filters { grid-template-columns: 1fr 1fr; } .audit-row { grid-template-columns: 1fr; } }
 .readonly .palette, .readonly .edit-only { display: none !important; }
 .readonly .main { grid-template-columns: minmax(0, 1fr) 320px; }
 /* the details panel can be closed to give the drawing more room */
@@ -361,6 +372,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 <div class="overlay" id="pwModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pwTitle" style="width:min(420px,100%)" id="pwBody"></div>
+</div>
+
+<div class="overlay" id="auditModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="auditTitle" style="width:min(980px,100%)" id="auditBody"></div>
 </div>
 
 <div class="auth" id="authScreen" hidden><div class="auth-card" id="authCard"></div></div>
@@ -2255,7 +2270,7 @@ function renderUserMenu() {
   $("#userInitial").textContent = (me.name || me.email).trim().charAt(0).toUpperCase();
   $("#userName").textContent = me.name || me.email;
   $("#userMenuBody").innerHTML = `<div class="who"><b>${esc(me.name)}</b><small>${esc(me.email)}</small><span class="role ${me.role}">${esc(roleLabel(me.role))}</span></div>`
-    + (me.role === "admin" ? `<button class="btn" data-um="users">${L("จัดการผู้ใช้และอีเมล", "Users & e-mail settings")}</button>` : "")
+    + (me.role === "admin" ? `<button class="btn" data-um="users">${L("จัดการผู้ใช้และอีเมล", "Users & e-mail settings")}</button><button class="btn" data-um="audit">${L("บันทึกการใช้งาน", "Activity log")}</button>` : "")
     + `<button class="btn" data-um="password">${L("เปลี่ยนรหัสผ่าน", "Change password")}</button><button class="btn" data-um="logout">${L("ออกจากระบบ", "Sign out")}</button>`;
 }
 function applyRole() {
@@ -2274,6 +2289,7 @@ $("#userMenuBody").addEventListener("click", async (e) => {
   }
   if (b.dataset.um === "password") return openPassword();
   if (b.dataset.um === "users") return openUsers();
+  if (b.dataset.um === "audit") return openAudit();
 });
 document.addEventListener("click", (e) => { if (!e.target.closest("#userMenu")) $("#userMenu").open = false; });
 
@@ -2359,6 +2375,114 @@ async function saveSmtp(quiet) {
   return ok;
 }
 $("#usersBody").addEventListener("submit", async (e) => { e.preventDefault(); await saveSmtp(false); openUsers(); });
+
+/* ---------- Audit log (admin) ---------- */
+const AUDIT_ACTIONS = {
+  "auth.login": ["เข้าสู่ระบบ", "Signed in"], "auth.logout": ["ออกจากระบบ", "Signed out"],
+  "auth.login_failed": ["เข้าสู่ระบบไม่สำเร็จ", "Failed sign-in"], "auth.locked": ["ถูกพักเพราะใส่รหัสผิดหลายครั้ง", "Locked out after failed sign-ins"],
+  "account.register": ["สมัครสมาชิก", "Signed up"], "account.verify": ["ยืนยันอีเมล", "Verified e-mail"],
+  "account.reset_request": ["ขอลิงก์ตั้งรหัสผ่านใหม่", "Asked for a password reset"], "account.reset": ["ตั้งรหัสผ่านใหม่", "Reset password"],
+  "account.password": ["เปลี่ยนรหัสผ่าน", "Changed password"],
+  "admin.role": ["เปลี่ยนสิทธิ์ผู้ใช้", "Changed a user's role"], "admin.verify": ["ยืนยันบัญชีให้ผู้ใช้", "Verified a user"],
+  "admin.delete_user": ["ลบผู้ใช้", "Deleted a user"], "admin.settings": ["แก้การตั้งค่าระบบ", "Changed settings"],
+  "diagram.create": ["สร้างผัง", "Created a diagram"], "diagram.edit": ["แก้ไขผัง", "Edited a diagram"], "diagram.delete": ["ลบผัง", "Deleted a diagram"],
+};
+const AUDIT_FIELDS = {
+  name: ["ชื่อ", "name"], type: ["ชนิด", "type"], ip: ["IP", "IP"], mask: ["Subnet", "subnet"], gateway: ["Gateway", "gateway"], vlan: ["VLAN", "VLAN"],
+  mac: ["MAC", "MAC"], vendor: ["ยี่ห้อ", "vendor"], model: ["รุ่น", "model"], serial: ["Serial", "serial"], os: ["OS", "OS"], location: ["ตำแหน่ง", "location"],
+  status: ["สถานะ", "status"], notes: ["หมายเหตุ", "notes"], color: ["สี", "color"], custom: ["ฟิลด์เพิ่มเติม", "custom fields"], kind: ["ชนิดสาย", "cable type"],
+  label: ["ป้ายบนสาย", "label"], fromPort: ["พอร์ตต้นทาง", "port A"], toPort: ["พอร์ตปลายทาง", "port B"], route: ["รูปแบบเส้น", "line style"], ends: ["ปลายสาย", "ends"],
+};
+const auditKind = (k) => ({ node: L("อุปกรณ์", "device"), zone: L("โซน", "zone"), link: L("สาย", "link"), title: L("ชื่อผัง", "diagram name") }[k] || k);
+function auditValue(field, v) {
+  if (v === "" || v == null) return L("(ว่าง)", "(empty)");
+  if (field === "type" && TYPES[v]) return TYPES[v].label;
+  if (field === "status" && STATUS[v]) return STATUS[v].label;
+  if (field === "kind" && LINKS[v]) return LINKS[v].label;
+  if (field === "route") return v === "elbow" ? L("เส้นหักมุม", "right-angle") : L("เส้นตรง", "straight");
+  return v;
+}
+function auditChange(c) {
+  const what = `${auditKind(c.kind)} ${c.name || ""}`.trim();
+  if (c.op === "add") return L(`เพิ่ม${what}`, `Added ${what}`) + (c.type && (TYPES[c.type] || LINKS[c.type]) ? ` (${(TYPES[c.type] || LINKS[c.type]).label})` : "");
+  if (c.op === "del") return L(`ลบ${what}`, `Removed ${what}`);
+  if (c.op === "move") return c.kind === "zone" ? L(`ย้ายหรือปรับขนาด${what}`, `Moved or resized ${what}`) : L(`ย้ายตำแหน่ง${what}`, `Moved ${what}`);
+  if (c.op === "path") return L(`ปรับแนวเส้น${what}`, `Re-routed ${what}`);
+  const f = AUDIT_FIELDS[c.field] ? L(...AUDIT_FIELDS[c.field]) : EXTRA_LABELS[c.field] || c.field;
+  if (c.kind === "title") return `${L("ชื่อผัง", "Diagram name")}: “${auditValue("", c.from)}” → “${auditValue("", c.to)}”`;
+  return `${what} · ${f}: “${auditValue(c.field, c.from)}” → “${auditValue(c.field, c.to)}”`;
+}
+function auditSummary(e) {
+  if (e.action === "admin.role") return `${e.target ? e.target.name + " (" + e.target.email + ")" : ""}: ${roleLabel(e.from)} → ${roleLabel(e.to)}`;
+  if (e.action === "admin.verify" || e.action === "admin.delete_user") return e.target ? `${e.target.name} (${e.target.email})` : "";
+  if (e.action === "admin.settings") return (e.fields || []).map((f) => (f === "smtp" ? L("การส่งอีเมล", "e-mail sending") : L("ที่อยู่เว็บ", "web address"))).join(", ");
+  if (e.action === "auth.login_failed" || e.action === "auth.locked") return e.email || "";
+  if (e.action === "account.register") return roleLabel(e.role);
+  if (e.diagram) return `“${e.diagram.title}”` + (e.count ? ` · ${L("อุปกรณ์", "devices")} ${e.count.nodes} · ${L("สาย", "links")} ${e.count.links} · ${L("โซน", "zones")} ${e.count.zones}` : "");
+  return "";
+}
+let auditRows = [], auditFilter = { user: "", group: "", diagram: "", from: "", to: "", q: "" };
+async function openAudit() {
+  openModal("#auditModal");
+  const box = $("#auditBody");
+  box.innerHTML = `<h2 id="auditTitle">${L("บันทึกการใช้งาน", "Activity log")}</h2><p class="muted">${L("กำลังโหลด…", "Loading…")}</p>`;
+  let users = [], diagrams = [];
+  try { [users, diagrams] = await Promise.all([apiFetch("users").then((r) => r.json()), apiFetch("diagrams").then((r) => r.json())]); } catch (e) {}
+  const f = auditFilter;
+  const opt = (v, label, cur) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(label)}</option>`;
+  box.innerHTML = `<h2 id="auditTitle">${L("บันทึกการใช้งาน", "Activity log")}</h2>
+    <p class="muted" style="margin:0;font-size:13px;line-height:1.55">${L("การแก้ไขผังของคนเดียวกันในช่วงเวลาใกล้กันจะรวมเป็นรายการเดียว และแสดงหลังหยุดแก้ไขประมาณ 2 นาที", "Edits by the same person close together are grouped into one entry, which appears about 2 minutes after they stop editing.")}</p>
+    <form id="auditForm" class="fields audit-filters">
+      <div class="f"><label for="af_user">${L("ผู้ใช้", "User")}</label><select id="af_user">${opt("", L("ทุกคน", "Everyone"), f.user)}${users.map((u) => opt(u.id, `${u.name} (${u.email})`, f.user)).join("")}</select></div>
+      <div class="f"><label for="af_group">${L("ประเภท", "Type")}</label><select id="af_group">${opt("", L("ทั้งหมด", "All"), f.group)}${opt("diagram", L("การแก้ไขผัง", "Diagram changes"), f.group)}${opt("auth", L("การเข้าสู่ระบบ", "Sign-ins"), f.group)}${opt("account", L("บัญชีผู้ใช้", "Accounts"), f.group)}${opt("admin", L("งานผู้ดูแลระบบ", "Admin actions"), f.group)}</select></div>
+      <div class="f"><label for="af_diagram">${L("ผัง", "Diagram")}</label><select id="af_diagram">${opt("", L("ทุกผัง", "All diagrams"), f.diagram)}${diagrams.map((d) => opt(d.id, d.title, f.diagram)).join("")}</select></div>
+      <div class="f"><label for="af_q">${L("ค้นหาคำ", "Search")}</label><input id="af_q" value="${esc(f.q)}" placeholder="${L("เช่น ชื่ออุปกรณ์, IP", "e.g. device name, IP")}"></div>
+      <div class="f"><label for="af_from">${L("ตั้งแต่วันที่", "From")}</label><input id="af_from" type="date" value="${esc(f.from)}"></div>
+      <div class="f"><label for="af_to">${L("ถึงวันที่", "To")}</label><input id="af_to" type="date" value="${esc(f.to)}"></div>
+      <div class="actions" style="margin:0;grid-column:1/-1"><button class="btn primary">${L("ค้นหา", "Search")}</button><button class="btn" type="button" id="auditCsv">${L("ส่งออก CSV", "Export CSV")}</button><div class="spacer"></div><button class="btn" type="button" data-close>${L("ปิด", "Close")}</button></div>
+    </form>
+    <div id="auditList" class="audit-list"><p class="muted">${L("กำลังโหลด…", "Loading…")}</p></div>`;
+  loadAudit();
+}
+async function loadAudit() {
+  const f = auditFilter, p = new URLSearchParams({ limit: "500" });
+  if (f.user) p.set("user", f.user);
+  if (f.group) p.set("group", f.group);
+  if (f.diagram) p.set("diagram", f.diagram);
+  if (f.q.trim()) p.set("q", f.q.trim());
+  if (f.from) p.set("from", new Date(f.from + "T00:00:00").toISOString());
+  if (f.to) p.set("to", new Date(f.to + "T23:59:59.999").toISOString());
+  const list = $("#auditList");
+  try {
+    const r = await apiFetch("audit?" + p);
+    if (!r.ok) throw new Error(r.status);
+    auditRows = await r.json();
+  } catch (e) { list.innerHTML = noteHtml(errNote("network")); return; }
+  if (!auditRows.length) { list.innerHTML = `<p class="muted">${L("ไม่พบรายการ", "Nothing found")}</p>`; return; }
+  const when = (t) => new Date(t).toLocaleString(L("th-TH", "en-GB"), { dateStyle: "medium", timeStyle: "medium" });
+  list.innerHTML = `<p class="muted" style="margin:0 0 6px;font-size:12.5px">${L(`แสดง ${auditRows.length} รายการล่าสุด`, `Showing the latest ${auditRows.length}`)}</p>` + auditRows.map((e) => {
+    const act = AUDIT_ACTIONS[e.action] ? L(...AUDIT_ACTIONS[e.action]) : e.action;
+    const bad = e.action === "auth.login_failed" || e.action === "auth.locked" || e.action.endsWith("delete") || e.action === "admin.delete_user";
+    const ch = (e.changes || []).map(auditChange);
+    const first = ch.slice(0, 6), rest = ch.slice(6);
+    let det = first.length ? `<ul>${first.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
+    if (rest.length || e.more) det += `<details><summary>${L(`ดูอีก ${rest.length + (e.more || 0)} รายการ`, `${rest.length + (e.more || 0)} more`)}</summary><ul>${rest.map((c) => `<li>${esc(c)}</li>`).join("")}${e.more ? `<li class="muted">${L(`และอีก ${e.more} รายการที่ไม่ได้บันทึก`, `and ${e.more} more not stored`)}</li>` : ""}</ul></details>`;
+    return `<div class="audit-row${bad ? " bad" : ""}"><div class="audit-meta"><b>${esc(act)}</b><span>${esc(when(e.t))}</span><span>${e.user ? esc(e.user.name) + ` <small>${esc(e.user.email)}</small>` : `<small>${L("ไม่ระบุผู้ใช้", "unknown user")}</small>`}</span><small>IP ${esc(e.ip || "-")}</small></div><div class="audit-what">${esc(auditSummary(e))}${det}</div></div>`;
+  }).join("");
+}
+function auditCsv() {
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = [[L("เวลา", "Time"), L("ผู้ใช้", "User"), L("อีเมล", "E-mail"), "IP", L("การกระทำ", "Action"), L("รายการ", "Subject"), L("รายละเอียด", "Details")]];
+  for (const e of auditRows) rows.push([new Date(e.t).toLocaleString(L("th-TH", "en-GB")), e.user?.name || "", e.user?.email || "", e.ip || "", AUDIT_ACTIONS[e.action] ? L(...AUDIT_ACTIONS[e.action]) : e.action, auditSummary(e), (e.changes || []).map(auditChange).join(" | ")]);
+  saveFile("netplan-activity-log.csv", "﻿" + rows.map((r) => r.map(q).join(",")).join("\r\n"), "text/csv");
+}
+$("#auditBody").addEventListener("submit", (e) => {
+  e.preventDefault();
+  auditFilter = { user: $("#af_user").value, group: $("#af_group").value, diagram: $("#af_diagram").value, q: $("#af_q").value, from: $("#af_from").value, to: $("#af_to").value };
+  $("#auditList").innerHTML = `<p class="muted">${L("กำลังโหลด…", "Loading…")}</p>`;
+  loadAudit();
+});
+$("#auditBody").addEventListener("click", (e) => { if (e.target.closest("#auditCsv")) auditCsv(); });
 
 /* ---------- Boot ---------- */
 function boot() {
