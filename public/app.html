@@ -237,6 +237,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .readonly .palette, .readonly .edit-only { display: none !important; }
 .readonly .main { grid-template-columns: minmax(0, 1fr) 320px; }
+/* the details panel can be closed to give the drawing more room */
+.insp-close { position: sticky; top: -6px; float: right; margin: -6px -6px 4px 8px; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; display: grid; place-items: center; z-index: 1; color: var(--muted); }
+.insp-close:hover { color: var(--fg); background: var(--panel-2); }
+.insp-close svg { width: 14px; height: 14px; }
+.insp-hidden .inspector { display: none; }
+.insp-hidden .main { grid-template-columns: 216px minmax(0, 1fr); }
+.insp-hidden.readonly .main { grid-template-columns: minmax(0, 1fr); }
+#inspOpen { display: none; }
+.insp-hidden #inspOpen { display: inline-flex; }
 @media (max-width: 860px) { .user-row { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -309,6 +318,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
         <span id="zoomVal">100%</span>
         <button class="btn" id="zoomIn" title="ซูมเข้า" aria-label="ซูมเข้า">+</button>
         <button class="btn" id="zoomFit" title="พอดีจอ">พอดีจอ</button>
+        <button class="btn" id="inspOpen" title="เปิดแผงรายละเอียด">แผงรายละเอียด</button>
         <button class="btn edit-only" id="multiBtn" aria-pressed="false" title="เลือกหลายชิ้น">เลือกหลายชิ้น</button>
       </div>
     </section>
@@ -1267,6 +1277,7 @@ const STATIC_TEXT = [
   ["#zoomFit", "text", "พอดีจอ", "Fit"], ["#zoomFit", "title", "พอดีจอ", "Fit to screen"],
   ["#multiBtn", "text", "เลือกหลายชิ้น", "Multi-select"], ["#multiBtn", "title", "แตะเพื่อเพิ่มทีละชิ้น หรือลากกรอบบนพื้นที่ว่าง (เหมือนกด Shift ค้างไว้)", "Tap to add items one by one, or drag a box on empty space (same as holding Shift)"],
   ["#inspector", "aria-label", "รายละเอียด", "Details"],
+  ["#inspOpen", "text", "แผงรายละเอียด", "Details panel"], ["#inspOpen", "title", "เปิดแผงรายละเอียด", "Open the details panel"],
   ["#jsonTitle", "text", "เปิด / บันทึกผังเป็น JSON", "Open / save the diagram as JSON"],
   ["#jsonHelp", "text", "ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”", "Below is the current diagram as JSON. Copy it to keep a copy, or paste saved JSON and press “Load this text”."],
   ["#jsonText", "aria-label", "ข้อมูล JSON", "JSON data"],
@@ -1367,7 +1378,7 @@ function renderInspector() {
   multi = new Set([...multi].filter(keyExists));
   if (sel) multi.clear();
   if (multi.size === 1) setSelection(multi);
-  if (multi.size >= 2) { inspector.innerHTML = multiPanel(); lockInspector(); return; }
+  if (multi.size >= 2) { inspector.innerHTML = closeBtnHtml() + multiPanel(); lockInspector(); return; }
   let h = "";
   if (sel && sel.kind === "node") {
     const n = findNode(sel.id), t = TYPES[n.type];
@@ -1465,8 +1476,14 @@ function renderInspector() {
       <li><b>Delete</b> Delete · <b>Undo</b> Ctrl+Z · <b>Duplicate</b> Ctrl+D · <b>Search</b> Ctrl+F</li>`)}
     </ul>`;
   }
-  inspector.innerHTML = h;
+  inspector.innerHTML = closeBtnHtml() + h;
   lockInspector();
+}
+const closeBtnHtml = () => `<button class="insp-close" data-insp-close title="${L("ปิดแผงนี้ (เปิดใหม่ได้ที่ปุ่ม “แผงรายละเอียด” มุมขวาล่าง)", "Close this panel (reopen it with “Details panel” at the bottom right)")}" aria-label="${L("ปิดแผงรายละเอียด", "Close the details panel")}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>`;
+function setInspectorOpen(open) {
+  document.body.classList.toggle("insp-hidden", !open);
+  try { localStorage.setItem("netplan.inspector", open ? "open" : "closed"); } catch (e) {}
+  requestAnimationFrame(updateScrollbars);
 }
 // Read-only accounts see the same panel with every control locked and the edit buttons removed.
 function lockInspector() {
@@ -1474,7 +1491,7 @@ function lockInspector() {
   for (const el of inspector.querySelectorAll("input,select,textarea")) {
     if (el.tagName === "SELECT" || el.type === "color" || el.type === "checkbox") el.disabled = true; else el.readOnly = true;
   }
-  for (const b of inspector.querySelectorAll("button")) if (!b.dataset.pick && !b.dataset.gotoLink) b.hidden = true;
+  for (const b of inspector.querySelectorAll("button")) if (!b.dataset.pick && !b.dataset.gotoLink && b.dataset.inspClose == null) b.hidden = true;
 }
 
 let editSnapshot = null;
@@ -1522,6 +1539,7 @@ inspector.addEventListener("input", (e) => {
 });
 inspector.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.inspClose != null) return setInspectorOpen(false);
   if (!canEdit && !b.dataset.pick && !b.dataset.gotoLink) return;
   if (b.id === "delBtn") return deleteSelected();
   if (b.dataset.pick) { setSelection([b.dataset.pick]); const o = keyExists(b.dataset.pick); centerOn(b.dataset.pick[0] === "n" ? o : { x: o.x + o.w / 2, y: o.y + o.h / 2 }); render(); renderInspector(); return; }
@@ -1757,8 +1775,13 @@ svg.addEventListener("wheel", (e) => {
   const r = svg.getBoundingClientRect();
   zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
 }, { passive: false });
+$("#inspOpen").onclick = () => setInspectorOpen(true);
+try { if (localStorage.getItem("netplan.inspector") === "closed") document.body.classList.add("insp-hidden"); } catch (e) {}
 svg.addEventListener("dblclick", (e) => {
-  const t = e.target.closest('[data-kind="node"],[data-kind="zone"]');
+  // the first click re-renders the drawing, so look up what is under the pointer now
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const t = el && el.closest('[data-kind="node"],[data-kind="zone"],[data-kind="link"]');
+  if (t && document.body.classList.contains("insp-hidden")) setInspectorOpen(true);
   if (t) setTimeout(() => { const i = $("#f_name"); i && (i.focus(), i.select()); }, 0);
 });
 
