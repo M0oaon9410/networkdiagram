@@ -100,9 +100,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 #canvas { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
 #canvas.mode-connect { cursor: crosshair; }
 #canvas.mode-zone { cursor: cell; }
-.zoomctl { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+.zoomctl { position: absolute; right: 22px; bottom: 22px; display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
 .zoomctl .btn { border: none; padding: 5px 8px; }
 .zoomctl span { font-family: var(--font-mono); font-size: 12px; color: var(--muted); align-self: center; min-width: 44px; text-align: center; }
+/* canvas scrollbars: the track covers the drawing plus some margin, the thumb is what's on screen */
+.sbar { position: absolute; background: color-mix(in srgb, var(--fg) 5%, transparent); touch-action: none; user-select: none; z-index: 2; }
+.sbar.h { left: 0; right: 12px; bottom: 0; height: 12px; }
+.sbar.v { top: 0; bottom: 12px; right: 0; width: 12px; }
+.sbar i { position: absolute; border-radius: 6px; background: color-mix(in srgb, var(--fg) 28%, transparent); cursor: grab; }
+.sbar.h i { top: 2px; bottom: 2px; min-width: 24px; }
+.sbar.v i { left: 2px; right: 2px; min-height: 24px; }
+.sbar i:hover, .sbar i.on { background: color-mix(in srgb, var(--fg) 45%, transparent); }
+.sbar i.on { cursor: grabbing; }
 .stage-top { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; pointer-events: none; }
 .stage-top > * { pointer-events: auto; }
 .hint { flex: 0 1 auto; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--muted); }
@@ -293,6 +302,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
           <div class="search-res" id="searchRes" role="listbox" hidden></div>
         </div>
       </div>
+      <div class="sbar h" id="hbar" aria-hidden="true"><i></i></div>
+      <div class="sbar v" id="vbar" aria-hidden="true"><i></i></div>
       <div class="zoomctl">
         <button class="btn" id="zoomOut" title="ซูมออก" aria-label="ซูมออก">−</button>
         <span id="zoomVal">100%</span>
@@ -685,7 +696,63 @@ function applyView() {
   world.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.k})`);
   $("#bgRect").setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.k})`);
   $("#zoomVal").textContent = Math.round(view.k * 100) + "%";
+  updateScrollbars();
 }
+/* ---------- Scrollbars ----------
+   The scrollable area is the drawing's bounds plus a screen of margin, widened to include
+   wherever the view is now, so panning far away never makes the thumb jump. */
+let sbArea = null;
+function updateScrollbars() {
+  const r = svg.getBoundingClientRect();
+  if (!r.width || !r.height || !doc) return;
+  const vis = { x: -view.x / view.k, y: -view.y / view.k, w: r.width / view.k, h: r.height / view.k };
+  const b = bbox(), mx = vis.w / 2, my = vis.h / 2;
+  const x0 = Math.min(b.x - mx, vis.x), y0 = Math.min(b.y - my, vis.y);
+  const x1 = Math.max(b.x + b.w + mx, vis.x + vis.w), y1 = Math.max(b.y + b.h + my, vis.y + vis.h);
+  sbArea = { x: x0, y: y0, w: x1 - x0, h: y1 - y0, vis };
+  for (const [bar, horiz] of [[$("#hbar"), true], [$("#vbar"), false]]) {
+    const track = horiz ? bar.clientWidth : bar.clientHeight, th = bar.firstElementChild;
+    const size = Math.max(24, track * (horiz ? vis.w / sbArea.w : vis.h / sbArea.h));
+    const pos = (track - size) * (horiz ? (vis.x - x0) / Math.max(1e-6, sbArea.w - vis.w) : (vis.y - y0) / Math.max(1e-6, sbArea.h - vis.h));
+    th.style[horiz ? "width" : "height"] = size + "px";
+    th.style[horiz ? "left" : "top"] = (isFinite(pos) ? pos : 0) + "px";
+  }
+}
+function bindScrollbar(bar, horiz) {
+  const th = bar.firstElementChild;
+  let grab = null;
+  // world units moved per pixel of thumb travel
+  const scale = () => { const track = horiz ? bar.clientWidth : bar.clientHeight, size = horiz ? th.offsetWidth : th.offsetHeight; return ((horiz ? sbArea.w - sbArea.vis.w : sbArea.h - sbArea.vis.h)) / Math.max(1, track - size); };
+  th.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    grab = { c: horiz ? e.clientX : e.clientY, v: horiz ? view.x : view.y, s: scale() };
+    th.setPointerCapture(e.pointerId); th.classList.add("on");
+  });
+  th.addEventListener("pointermove", (e) => {
+    if (!grab) return;
+    const d = ((horiz ? e.clientX : e.clientY) - grab.c) * grab.s * view.k;
+    if (horiz) view.x = grab.v - d; else view.y = grab.v - d;
+    applyView();
+  });
+  const end = () => { grab = null; th.classList.remove("on"); updateScrollbars(); };
+  th.addEventListener("pointerup", end); th.addEventListener("pointercancel", end);
+  bar.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const d = e.deltaY || e.deltaX;
+    if (horiz) view.x -= d; else view.y -= d;
+    applyView();
+  }, { passive: false });
+  // clicking the track pages toward that spot
+  bar.addEventListener("pointerdown", (e) => {
+    if (e.target !== bar || !sbArea) return;
+    const tr = th.getBoundingClientRect(), before = horiz ? e.clientX < tr.left : e.clientY < tr.top;
+    const step = (horiz ? sbArea.vis.w : sbArea.vis.h) * 0.9 * view.k;
+    if (horiz) view.x += before ? step : -step; else view.y += before ? step : -step;
+    applyView();
+  });
+}
+bindScrollbar($("#hbar"), true); bindScrollbar($("#vbar"), false);
+window.addEventListener("resize", updateScrollbars);
 function zoomAt(factor, cx, cy) {
   const k = Math.min(3, Math.max(0.2, view.k * factor));
   view.x = cx - (cx - view.x) * (k / view.k);
@@ -1131,6 +1198,7 @@ function render() {
       temp = `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="12" fill="var(--accent)" fill-opacity=".08" stroke="var(--accent)" stroke-dasharray="7 5" pointer-events="none"/>`;
     }
     world.innerHTML = diagramMarkup() + temp;
+    updateScrollbars();
   });
 }
 function normRect(d) {
