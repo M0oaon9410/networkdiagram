@@ -82,7 +82,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .server-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
 .server-pill.on i { background: #2f9e5a; }
 
-.main { min-height: 0; display: grid; grid-template-columns: 216px minmax(0, 1fr) 320px; }
+body { --pal-w: 216px; --insp-w: 320px; }
+.main { min-height: 0; display: grid; grid-template-columns: var(--pal-w) minmax(0, 1fr) var(--insp-w); }
 .palette { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px 10px 20px; }
 .palette h3 { margin: 14px 4px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
 .palette h3:first-child { margin-top: 0; }
@@ -246,17 +247,38 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .audit-what ul { margin: 4px 0 0; padding-left: 18px; }
 .audit-what details summary { cursor: pointer; color: var(--accent); margin-top: 4px; }
 @media (max-width: 720px) { .audit-filters { grid-template-columns: 1fr 1fr; } .audit-row { grid-template-columns: 1fr; } }
-.readonly .palette, .readonly .edit-only { display: none !important; }
-.readonly .main { grid-template-columns: minmax(0, 1fr) 320px; }
+.readonly .edit-only { display: none !important; }
+
 /* the details panel can be closed to give the drawing more room */
-.insp-close { position: sticky; top: -6px; float: right; margin: -6px -6px 4px 8px; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; display: grid; place-items: center; z-index: 1; color: var(--muted); }
-.insp-close:hover { color: var(--fg); background: var(--panel-2); }
-.insp-close svg { width: 14px; height: 14px; }
-.insp-hidden .inspector { display: none; }
-.insp-hidden .main { grid-template-columns: 216px minmax(0, 1fr); }
-.insp-hidden.readonly .main { grid-template-columns: minmax(0, 1fr); }
-#inspOpen { display: none; }
-.insp-hidden #inspOpen { display: inline-flex; }
+/* side panels: open, shrunk to a narrow strip ("mini"), or closed */
+.ptool { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; display: grid; place-items: center; color: var(--muted); padding: 0; flex: none; }
+.ptool:hover { color: var(--fg); background: var(--panel-2); }
+.ptool svg { width: 14px; height: 14px; }
+.panel-tools { display: flex; gap: 4px; align-items: center; }
+.insp-tools { position: sticky; top: -6px; float: right; margin: -6px -6px 4px 8px; z-index: 1; }
+.pal-tools { position: sticky; top: -12px; margin: -12px -10px 8px; padding: 8px 10px; background: var(--panel); z-index: 1; }
+.pal-tools .pt-title { flex: 1; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+[data-state="open"].ptool { display: none; }
+.pal-mini [data-panel="pal"][data-state="mini"], .insp-mini [data-panel="insp"][data-state="mini"] { display: none; }
+.pal-mini [data-panel="pal"][data-state="open"], .insp-mini [data-panel="insp"][data-state="open"] { display: grid; }
+body.pal-mini { --pal-w: 60px; }
+body.pal-hidden, body.readonly { --pal-w: 0px; }
+body.insp-mini { --insp-w: 46px; }
+body.insp-hidden { --insp-w: 0px; }
+.pal-hidden .palette, .readonly .palette, .insp-hidden .inspector { visibility: hidden; overflow: hidden; padding: 0; border: 0; }
+.pal-mini .palette { padding: 12px 6px; overflow-x: hidden; }
+.pal-mini .palette h3, .pal-mini .pal-hint, .pal-mini .pal-item > span:not(.tile), .pal-mini .pt-title { display: none; }
+.pal-mini .pal-tools { flex-direction: column; margin: -12px -6px 6px; padding: 8px 6px; }
+.pal-mini .pal-item { justify-content: center; padding: 6px 0; }
+.insp-mini .inspector { padding: 8px; overflow: hidden; }
+.insp-mini .inspector > :not(.panel-tools) { display: none; }
+.insp-mini .insp-tools { float: none; flex-direction: column; margin: 0; position: static; }
+#inspOpen, #palOpen { display: none; }
+.insp-hidden #inspOpen, body.pal-hidden:not(.readonly) #palOpen { display: inline-flex; }
+@media (max-width: 900px) {
+  .pal-hidden .palette, .readonly .palette, .insp-hidden .inspector { display: none !important; }
+  .pal-mini .pal-tools { flex-direction: row; }
+}
 @media (max-width: 860px) { .user-row { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -329,6 +351,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
         <span id="zoomVal">100%</span>
         <button class="btn" id="zoomIn" title="ซูมเข้า" aria-label="ซูมเข้า">+</button>
         <button class="btn" id="zoomFit" title="พอดีจอ">พอดีจอ</button>
+        <button class="btn" id="palOpen" title="เปิดแถบอุปกรณ์">อุปกรณ์</button>
         <button class="btn" id="inspOpen" title="เปิดแผงรายละเอียด">แผงรายละเอียด</button>
         <button class="btn edit-only" id="multiBtn" aria-pressed="false" title="เลือกหลายชิ้น">เลือกหลายชิ้น</button>
       </div>
@@ -1233,12 +1256,12 @@ function normRect(d) {
 /* ---------- Palette ---------- */
 function buildPalette() {
   const p = $("#palette");
-  let h = "";
+  let h = panelTools("pal", L("อุปกรณ์", "Devices"));
   for (const [ck, c] of Object.entries(CATS)) {
     const items = Object.entries(TYPES).filter(([, t]) => t.cat === ck);
     if (!items.length) continue;
     h += `<h3>${esc(c.label)}</h3><div class="pal-list">`;
-    for (const [k, t] of items) h += `<button class="pal-item" draggable="true" data-type="${k}" title="${L("คลิกเพื่อเพิ่ม หรือลากไปวางบนผัง", "Click to add, or drag onto the diagram")}">${iconTile(k)}<span>${esc(t.label)}</span></button>`;
+    for (const [k, t] of items) h += `<button class="pal-item" draggable="true" data-type="${k}" title="${esc(t.label)} · ${L("คลิกเพื่อเพิ่ม หรือลากไปวางบนผัง", "click to add, or drag onto the diagram")}">${iconTile(k)}<span>${esc(t.label)}</span></button>`;
     h += `</div>`;
   }
   h += `<p class="pal-hint">${L("คลิกเพื่อเพิ่มกลางจอ หรือลากอุปกรณ์ไปวางตรงตำแหน่งที่ต้องการ", "Click to add at the center, or drag a device to where you want it")}</p>`;
@@ -1247,6 +1270,8 @@ function buildPalette() {
 function bindPalette() {
   const p = $("#palette");
   p.addEventListener("click", (e) => {
+    const pb = e.target.closest("[data-panel]");
+    if (pb) { setPanel(pb.dataset.panel, pb.dataset.state); return; }
     const b = e.target.closest(".pal-item"); if (!b) return;
     const r = svg.getBoundingClientRect();
     const cx = (r.width / 2 - view.x) / view.k, cy = (r.height / 2 - view.y) / view.k;
@@ -1292,6 +1317,7 @@ const STATIC_TEXT = [
   ["#zoomFit", "text", "พอดีจอ", "Fit"], ["#zoomFit", "title", "พอดีจอ", "Fit to screen"],
   ["#multiBtn", "text", "เลือกหลายชิ้น", "Multi-select"], ["#multiBtn", "title", "แตะเพื่อเพิ่มทีละชิ้น หรือลากกรอบบนพื้นที่ว่าง (เหมือนกด Shift ค้างไว้)", "Tap to add items one by one, or drag a box on empty space (same as holding Shift)"],
   ["#inspector", "aria-label", "รายละเอียด", "Details"],
+  ["#palOpen", "text", "อุปกรณ์", "Devices"], ["#palOpen", "title", "เปิดแถบอุปกรณ์", "Open the device panel"],
   ["#inspOpen", "text", "แผงรายละเอียด", "Details panel"], ["#inspOpen", "title", "เปิดแผงรายละเอียด", "Open the details panel"],
   ["#jsonTitle", "text", "เปิด / บันทึกผังเป็น JSON", "Open / save the diagram as JSON"],
   ["#jsonHelp", "text", "ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”", "Below is the current diagram as JSON. Copy it to keep a copy, or paste saved JSON and press “Load this text”."],
@@ -1514,19 +1540,34 @@ function renderInspector() {
   inspector.innerHTML = closeBtnHtml() + h;
   lockInspector();
 }
-const closeBtnHtml = () => `<button class="insp-close" data-insp-close title="${L("ปิดแผงนี้ (เปิดใหม่ได้ที่ปุ่ม “แผงรายละเอียด” มุมขวาล่าง)", "Close this panel (reopen it with “Details panel” at the bottom right)")}" aria-label="${L("ปิดแผงรายละเอียด", "Close the details panel")}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>`;
-function setInspectorOpen(open) {
-  document.body.classList.toggle("insp-hidden", !open);
-  try { localStorage.setItem("netplan.inspector", open ? "open" : "closed"); } catch (e) {}
+const ICON_LEFT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 6-6 6 6 6M19 6l-6 6 6 6"/></svg>`;
+const ICON_RIGHT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 6 6 6-6 6M5 6l6 6-6 6"/></svg>`;
+// Shrink / expand / close buttons for a side panel ("pal" on the left, "insp" on the right).
+function panelTools(which, title) {
+  const left = which === "pal";
+  const reopen = left ? L("เปิดใหม่ได้ที่ปุ่ม “อุปกรณ์” มุมขวาล่าง", "reopen it with “Devices” at the bottom right") : L("เปิดใหม่ได้ที่ปุ่ม “แผงรายละเอียด” มุมขวาล่าง", "reopen it with “Details panel” at the bottom right");
+  const b = (state, icon, tip) => `<button class="ptool" type="button" data-panel="${which}" data-state="${state}" title="${tip}" aria-label="${tip}">${icon}</button>`;
+  return `<div class="panel-tools ${which}-tools">${title ? `<span class="pt-title">${esc(title)}</span>` : ""}`
+    + b("mini", left ? ICON_LEFT : ICON_RIGHT, L("ย่อแถบ", "Shrink panel"))
+    + b("open", left ? ICON_RIGHT : ICON_LEFT, L("ขยายแถบ", "Expand panel"))
+    + b("closed", ICON_X, L("ปิดแถบ", "Close panel") + " (" + reopen + ")") + `</div>`;
+}
+const closeBtnHtml = () => panelTools("insp");
+function setPanel(which, state) {
+  const body = document.body.classList;
+  body.toggle(which + "-mini", state === "mini");
+  body.toggle(which + "-hidden", state === "closed");
+  try { localStorage.setItem(which === "pal" ? "netplan.palette" : "netplan.inspector", state); } catch (e) {}
   requestAnimationFrame(updateScrollbars);
 }
+const setInspectorOpen = (open) => setPanel("insp", open ? "open" : "closed");
 // Read-only accounts see the same panel with every control locked and the edit buttons removed.
 function lockInspector() {
   if (canEdit) return;
   for (const el of inspector.querySelectorAll("input,select,textarea")) {
     if (el.tagName === "SELECT" || el.type === "color" || el.type === "checkbox") el.disabled = true; else el.readOnly = true;
   }
-  for (const b of inspector.querySelectorAll("button")) if (!b.dataset.pick && !b.dataset.gotoLink && b.dataset.inspClose == null) b.hidden = true;
+  for (const b of inspector.querySelectorAll("button")) if (!b.dataset.pick && !b.dataset.gotoLink && !b.dataset.panel) b.hidden = true;
 }
 
 let editSnapshot = null;
@@ -1578,7 +1619,7 @@ inspector.addEventListener("input", (e) => {
 });
 inspector.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.inspClose != null) return setInspectorOpen(false);
+  if (b.dataset.panel) return setPanel(b.dataset.panel, b.dataset.state);
   if (!canEdit && !b.dataset.pick && !b.dataset.gotoLink) return;
   if (b.id === "delBtn") return deleteSelected();
   if (b.dataset.pick) { setSelection([b.dataset.pick]); const o = keyExists(b.dataset.pick); centerOn(b.dataset.pick[0] === "n" ? o : { x: o.x + o.w / 2, y: o.y + o.h / 2 }); render(); renderInspector(); return; }
@@ -1822,13 +1863,16 @@ svg.addEventListener("wheel", (e) => {
   if (e.shiftKey && !dx) view.x -= dy; else { view.x -= dx; view.y -= dy; }
   applyView();
 }, { passive: false });
-$("#inspOpen").onclick = () => setInspectorOpen(true);
-try { if (localStorage.getItem("netplan.inspector") === "closed") document.body.classList.add("insp-hidden"); } catch (e) {}
+$("#inspOpen").onclick = () => setPanel("insp", "open");
+$("#palOpen").onclick = () => setPanel("pal", "open");
+for (const [which, key] of [["pal", "netplan.palette"], ["insp", "netplan.inspector"]]) {
+  try { const v = localStorage.getItem(key); if (v === "mini" || v === "closed") setPanel(which, v); } catch (e) {}
+}
 svg.addEventListener("dblclick", (e) => {
   // the first click re-renders the drawing, so look up what is under the pointer now
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const t = el && el.closest('[data-kind="node"],[data-kind="zone"],[data-kind="link"]');
-  if (t && document.body.classList.contains("insp-hidden")) setInspectorOpen(true);
+  if (t && (document.body.classList.contains("insp-hidden") || document.body.classList.contains("insp-mini"))) setPanel("insp", "open");
   if (t) setTimeout(() => { const i = $("#f_name"); i && (i.focus(), i.select()); }, 0);
 });
 
