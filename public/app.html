@@ -1499,14 +1499,14 @@ function renderInspector() {
       <li><b>ใส่รายละเอียด</b> คลิกอุปกรณ์ แล้วกรอกข้อมูลที่แผงนี้</li>
       <li><b>เชื่อมสาย</b> กดโหมด “เชื่อมสาย” (C) แล้วลากจากอุปกรณ์หรือโซนหนึ่งไปอีกอันหนึ่ง หรือคลิกทีละตัว</li>
       <li><b>โซน / VLAN</b> กด “วาดโซน” (Z) แล้วลากเป็นกรอบ</li>
-      <li><b>เลื่อนผัง</b> ลากพื้นที่ว่าง · <b>ซูม</b> ล้อเมาส์</li>
+      <li><b>เลื่อนผัง</b> ลากพื้นที่ว่าง · หรือหมุนล้อเมาส์ (Shift+ล้อ เลื่อนซ้าย-ขวา) · <b>ซูม</b> Ctrl+ล้อเมาส์</li>
       <li><b>เลือกหลายชิ้น</b> Shift+คลิก, Shift+ลากกรอบ หรือ Ctrl+A แล้วลากย้ายหรือเปลี่ยนสีพร้อมกัน</li>
       <li><b>ลบ</b> Delete · <b>ย้อน</b> Ctrl+Z · <b>สำเนา</b> Ctrl+D · <b>ค้นหา</b> Ctrl+F</li>`, `
       <li><b>Add a device</b> click or drag it from the left panel</li>
       <li><b>Add details</b> click a device and fill in this panel</li>
       <li><b>Connect</b> press “Connect” (C) and drag from one device or zone to another, or click one then the other</li>
       <li><b>Zone / VLAN</b> press “Draw zone” (Z) and drag a box</li>
-      <li><b>Pan</b> drag empty space · <b>Zoom</b> mouse wheel</li>
+      <li><b>Pan</b> drag empty space · or use the mouse wheel (Shift+wheel for sideways) · <b>Zoom</b> Ctrl+wheel</li>
       <li><b>Pick several</b> Shift+click, Shift+drag a box or Ctrl+A, then move or recolor them together</li>
       <li><b>Delete</b> Delete · <b>Undo</b> Ctrl+Z · <b>Duplicate</b> Ctrl+D · <b>Search</b> Ctrl+F</li>`)}
     </ul>`;
@@ -1809,10 +1809,18 @@ function endDrag(e) {
 }
 svg.addEventListener("pointerup", endDrag);
 svg.addEventListener("pointercancel", () => { drag = null; render(); });
+// Wheel scrolls (Shift+wheel sideways); Ctrl/⌘+wheel and trackpad pinch zoom at the pointer.
 svg.addEventListener("wheel", (e) => {
   e.preventDefault();
-  const r = svg.getBoundingClientRect();
-  zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? svg.clientHeight : 1;
+  const dx = e.deltaX * unit, dy = e.deltaY * unit;
+  if (e.ctrlKey || e.metaKey) {
+    const r = svg.getBoundingClientRect();
+    zoomAt(Math.exp(-dy * 0.0015), e.clientX - r.left, e.clientY - r.top);
+    return;
+  }
+  if (e.shiftKey && !dx) view.x -= dy; else { view.x -= dx; view.y -= dy; }
+  applyView();
 }, { passive: false });
 $("#inspOpen").onclick = () => setInspectorOpen(true);
 try { if (localStorage.getItem("netplan.inspector") === "closed") document.body.classList.add("insp-hidden"); } catch (e) {}
