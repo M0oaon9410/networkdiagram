@@ -274,6 +274,11 @@ body.insp-hidden { --insp-w: 0px; }
 .insp-mini .inspector > :not(.panel-tools) { display: none; }
 .insp-mini .insp-tools { float: none; flex-direction: column; margin: 0; position: static; }
 #inspOpen, #palOpen { display: none; }
+/* full screen: the browser's own, or the page's when the browser refuses (e.g. inside a frame) */
+.stage:fullscreen { width: 100vw; height: 100vh; }
+.stage.stage-max { position: fixed; inset: 0; z-index: 45; }
+.full .toast { z-index: 80; }
+.zoomctl .btn span { font-family: inherit; font-size: inherit; color: inherit; min-width: 0; }
 .insp-hidden #inspOpen, body.pal-hidden:not(.readonly) #palOpen { display: inline-flex; }
 @media (max-width: 900px) {
   .pal-hidden .palette, .readonly .palette, .insp-hidden .inspector { display: none !important; }
@@ -351,6 +356,7 @@ body.insp-hidden { --insp-w: 0px; }
         <span id="zoomVal">100%</span>
         <button class="btn" id="zoomIn" title="ซูมเข้า" aria-label="ซูมเข้า">+</button>
         <button class="btn" id="zoomFit" title="พอดีจอ">พอดีจอ</button>
+        <button class="btn" id="fullBtn" title="ดูแบบเต็มจอ (F)" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>เต็มจอ</span></button>
         <button class="btn" id="palOpen" title="เปิดแถบอุปกรณ์">อุปกรณ์</button>
         <button class="btn" id="inspOpen" title="เปิดแผงรายละเอียด">แผงรายละเอียด</button>
         <button class="btn edit-only" id="multiBtn" aria-pressed="false" title="เลือกหลายชิ้น">เลือกหลายชิ้น</button>
@@ -1317,6 +1323,7 @@ const STATIC_TEXT = [
   ["#zoomFit", "text", "พอดีจอ", "Fit"], ["#zoomFit", "title", "พอดีจอ", "Fit to screen"],
   ["#multiBtn", "text", "เลือกหลายชิ้น", "Multi-select"], ["#multiBtn", "title", "แตะเพื่อเพิ่มทีละชิ้น หรือลากกรอบบนพื้นที่ว่าง (เหมือนกด Shift ค้างไว้)", "Tap to add items one by one, or drag a box on empty space (same as holding Shift)"],
   ["#inspector", "aria-label", "รายละเอียด", "Details"],
+  ["#fullBtn span", "text", "เต็มจอ", "Full screen"], ["#fullBtn", "title", "ดูแบบเต็มจอ (F)", "Full screen (F)"],
   ["#palOpen", "text", "อุปกรณ์", "Devices"], ["#palOpen", "title", "เปิดแถบอุปกรณ์", "Open the device panel"],
   ["#inspOpen", "text", "แผงรายละเอียด", "Details panel"], ["#inspOpen", "title", "เปิดแผงรายละเอียด", "Open the details panel"],
   ["#jsonTitle", "text", "เปิด / บันทึกผังเป็น JSON", "Open / save the diagram as JSON"],
@@ -1865,6 +1872,28 @@ svg.addEventListener("wheel", (e) => {
 }, { passive: false });
 $("#inspOpen").onclick = () => setPanel("insp", "open");
 $("#palOpen").onclick = () => setPanel("pal", "open");
+const stageEl = $("#stage");
+const isFull = () => document.fullscreenElement === stageEl || stageEl.classList.contains("stage-max");
+function syncFull() {
+  const on = isFull();
+  document.body.classList.toggle("full", on);
+  const b = $("#fullBtn");
+  b.setAttribute("aria-pressed", String(on));
+  b.querySelector("span").textContent = on ? L("ออกจากเต็มจอ", "Exit full screen") : L("เต็มจอ", "Full screen");
+  b.title = on ? L("ออกจากเต็มจอ (F หรือ Esc)", "Exit full screen (F or Esc)") : L("ดูแบบเต็มจอ (F)", "Full screen (F)");
+  requestAnimationFrame(updateScrollbars);
+}
+async function toggleFull() {
+  if (isFull()) {
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    stageEl.classList.remove("stage-max");
+  } else {
+    try { await stageEl.requestFullscreen(); } catch (e) { stageEl.classList.add("stage-max"); }
+  }
+  syncFull();
+}
+$("#fullBtn").onclick = toggleFull;
+document.addEventListener("fullscreenchange", syncFull);
 for (const [which, key] of [["pal", "netplan.palette"], ["insp", "netplan.inspector"]]) {
   try { const v = localStorage.getItem(key); if (v === "mini" || v === "closed") setPanel(which, v); } catch (e) {}
 }
@@ -1897,7 +1926,9 @@ document.addEventListener("keydown", (e) => {
   }
   if (typing) { if (e.key === "Escape") e.target.blur(); return; }
   if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); }
+  else if (e.key === "Escape" && stageEl.classList.contains("stage-max")) toggleFull();
   else if (e.key === "Escape") { if (pendingFrom || mode !== "select") setMode("select"); else { sel = null; multi = new Set(); render(); renderInspector(); } closeModals(); }
+  else if (k === "f" && !mod) toggleFull();
   else if (k === "v") setMode("select");
   else if (k === "c") setMode("connect");
   else if (k === "z") setMode("zone");
