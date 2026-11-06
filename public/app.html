@@ -1348,6 +1348,25 @@ function addNode(type, x, y) {
 }
 
 /* ---------- Inspector ---------- */
+// Operating systems offered in the OS / firmware list; anything else can still be typed in.
+const OS_GROUPS = [
+  ["Windows Server", ["Windows Server 2025", "Windows Server 2022", "Windows Server 2019", "Windows Server 2016", "Windows Server 2012 R2", "Windows Server 2012", "Windows Server 2008 R2"]],
+  ["Windows", ["Windows 11", "Windows 10"]],
+  ["Linux", ["Ubuntu Server 24.04 LTS", "Ubuntu Server 22.04 LTS", "Ubuntu Server 20.04 LTS", "Debian 12", "Debian 11", "Red Hat Enterprise Linux 9", "Red Hat Enterprise Linux 8",
+    "Rocky Linux 9", "Rocky Linux 8", "AlmaLinux 9", "AlmaLinux 8", "CentOS Stream 9", "CentOS 7", "Oracle Linux 9", "SUSE Linux Enterprise Server 15", "Fedora Server", "Alpine Linux", "Kali Linux"]],
+  ["Virtualization", ["VMware ESXi 8", "VMware ESXi 7", "Proxmox VE 8", "Microsoft Hyper-V Server", "Citrix XenServer"]],
+  ["Storage / NAS", ["TrueNAS", "Synology DSM", "QNAP QTS"]],
+  ["Network / Firewall", ["Cisco IOS", "Cisco IOS XE", "Cisco NX-OS", "Fortinet FortiOS", "Palo Alto PAN-OS", "Juniper Junos", "MikroTik RouterOS", "pfSense", "OPNsense", "Sophos Firewall OS", "Aruba AOS-CX", "Ubiquiti UniFi OS"]],
+  ["Other", ["macOS", "FreeBSD", "Android", "iOS"]],
+];
+const OS_LIST = new Set(OS_GROUPS.flatMap(([, list]) => list));
+function osField(val) {
+  const custom = !!val && !OS_LIST.has(val);
+  const opts = OS_GROUPS.map(([g, list]) => `<optgroup label="${esc(g)}">${list.map((v) => `<option value="${esc(v)}"${v === val ? " selected" : ""}>${esc(v)}</option>`).join("")}</optgroup>`).join("");
+  return `<div class="f full"><label for="f_os_pick">${L("ระบบปฏิบัติการ / เฟิร์มแวร์", "OS / firmware")}</label>`
+    + `<select id="f_os_pick" data-ospick><option value=""${val ? "" : " selected"}>${L("— เลือก —", "— choose —")}</option>${opts}<option value="__other"${custom ? " selected" : ""}>${L("อื่น ๆ (พิมพ์เอง)…", "Other (type it)…")}</option></select>`
+    + `<input id="f_os" data-field="os" value="${esc(custom ? val : "")}" placeholder="${L("พิมพ์ชื่อและเวอร์ชัน OS", "Type the OS name and version")}" autocomplete="off" spellcheck="false" style="margin-top:6px"${custom ? "" : " hidden"}></div>`;
+}
 function field(label, key, val, o = {}) {
   const id = "f_" + key.replace(/[^a-z0-9]/gi, "_");
   const cls = (o.full ? "f full" : "f");
@@ -1414,7 +1433,7 @@ function renderInspector() {
     h += field(L("ยี่ห้อ", "Vendor"), "vendor", n.vendor);
     h += field(L("รุ่น", "Model"), "model", n.model);
     h += field(L("หมายเลขซีเรียล", "Serial no."), "serial", n.serial);
-    h += field(L("ระบบปฏิบัติการ / เฟิร์มแวร์", "OS / firmware"), "os", n.os);
+    h += osField(n.os);
     h += field(L("ตำแหน่งติดตั้ง / Rack", "Location / rack"), "location", n.location, { full: true });
     h += `</div><div class="sec">${L("เฉพาะ", "")} ${esc(t.label)}${L("", " details")}</div><div class="fields">`;
     for (const k of t.extra) h += field(EXTRA_LABELS[k] || k, "extra." + k, n.extra[k] || "");
@@ -1533,7 +1552,11 @@ inspector.addEventListener("input", (e) => {
   }
   const obj = sel && (sel.kind === "node" ? findNode(sel.id) : sel.kind === "link" ? findLink(sel.id) : findZone(sel.id));
   if (!obj) return;
-  if (el.dataset.field) {
+  if (el.dataset.ospick != null) {
+    const box = inspector.querySelector("#f_os");
+    if (el.value === "__other") { box.hidden = false; box.focus(); obj.os = box.value; }
+    else { box.hidden = true; box.value = ""; obj.os = el.value; }
+  } else if (el.dataset.field) {
     const f = el.dataset.field;
     if (f.startsWith("extra.")) obj.extra[f.slice(6)] = el.value;
     else obj[f] = el.value;
