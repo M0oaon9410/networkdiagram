@@ -81,6 +81,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .server-pill { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
 .server-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
 .server-pill.on i { background: #2f9e5a; }
+.server-pill.dirty i { background: #e0a21b; }
+.savegrp { display: inline-flex; align-items: center; gap: 6px; }
+.savegrp[hidden] { display: none; }
+.autosave { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+.autosave input { margin: 0; }
+#saveBtn.dirty { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 
 body { --pal-w: 216px; --insp-w: 320px; }
 .main { min-height: 0; display: grid; grid-template-columns: var(--pal-w) minmax(0, 1fr) var(--insp-w); }
@@ -184,6 +190,7 @@ body { --pal-w: 216px; --insp-w: 320px; }
 
 /* SVG diagram */
 .nlabel { font: 600 12.5px var(--font-ui); fill: var(--fg); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
+.nrole { font: 500 10.5px var(--font-sans); fill: var(--muted); font-style: italic; paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
 .nip { font: 500 11px var(--font-mono); fill: var(--muted); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
 .llabel { font: 500 11px var(--font-mono); fill: var(--fg); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
 .lport { font: 500 10px var(--font-mono); fill: var(--muted); paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; stroke-linejoin: round; }
@@ -307,6 +314,10 @@ body.insp-hidden { --insp-w: 0px; }
     <div class="grp edit-only">
       <button class="btn" id="undoBtn" title="ย้อนกลับ (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/></svg><span class="hide-sm">ย้อน</span></button>
       <button class="btn" id="redoBtn" title="ทำซ้ำ (Ctrl+Y)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 7 5 5-5 5"/><path d="M20 12H10a6 6 0 0 0 0 12"/></svg><span class="hide-sm">ทำซ้ำ</span></button>
+    <span class="savegrp edit-only" id="saveGrp" hidden>
+      <button class="btn primary" id="saveBtn" title="บันทึก (Ctrl+S)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg><span class="hide-sm">บันทึก</span></button>
+      <label class="autosave" title="บันทึกขึ้นเซิร์ฟเวอร์ให้เองทุกครั้งที่แก้ไข"><input type="checkbox" id="autoSave"><span class="hide-sm">อัตโนมัติ</span></label>
+    </span>
     </div>
     <div class="spacer"></div>
     <div class="grp seg" role="group" aria-label="ภาษา / Language" id="langSeg"><button class="btn" data-lang="th" lang="th">ไทย</button><button class="btn" data-lang="en" lang="en">EN</button></div>
@@ -612,6 +623,8 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const uid = (p) => p + "_" + Math.random().toString(36).slice(2, 9);
 const snap = (v) => Math.round(v / 10) * 10;
 const findNode = (id) => doc.nodes.find((n) => n.id === id);
+// third line under a device: its role / service (Server details), shortened to fit
+const roleOf = (n) => { const r = String((n.extra && n.extra.role) || "").replace(/\s+/g, " ").trim(); return r.length > 28 ? r.slice(0, 27) + "…" : r; };
 const findLink = (id) => doc.links.find((l) => l.id === id);
 const findZone = (id) => doc.zones.find((z) => z.id === id);
 const keyOf = (kind, id) => (kind === "node" ? "n:" : "z:") + id;
@@ -704,20 +717,62 @@ function updateUndoButtons() {
 }
 
 /* ---------- Persistence ---------- */
-let saveTimer = null;
+// On the server, changes wait for the Save button (Ctrl+S) unless "Auto" is ticked.
+// A copy is always kept in this browser, so a reload does not lose unsaved work.
+let saveTimer = null, savedJson = null, saving = false;
+let autoSave = false;
+try { autoSave = localStorage.getItem("netplan.autosave") === "1"; } catch (e) {}
+const serverMode = () => !!(server && docId && canEdit);
+function markSaved(json) { savedJson = json != null ? json : JSON.stringify(doc); updateSaveUI(); }
+function isDirty() { return serverMode() && savedJson != null && JSON.stringify(doc) !== savedJson; }
+function updateSaveUI() {
+  const grp = $("#saveGrp"); if (!grp) return;
+  grp.hidden = !serverMode();
+  const dirty = isDirty();
+  $("#saveBtn").disabled = !dirty || saving;
+  $("#saveBtn").classList.toggle("dirty", dirty && !autoSave);
+  $("#autoSave").checked = autoSave;
+  $("#serverPill").classList.toggle("dirty", dirty && !autoSave);
+  if (dirty && !autoSave && !saving) setPill(L("ยังไม่บันทึก", "Not saved"), false);
+}
 function persist() {
   if (searchQ) runSearch();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId })); } catch (e) {}
-    if (server && docId && canEdit) {
-      try {
-        const r = await apiFetch("diagrams/" + encodeURIComponent(docId), { method: "PUT", body: doc });
-        setPill(r.ok ? L("บันทึกบนเซิร์ฟเวอร์แล้ว", "Saved to server") : L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")", r.ok);
-      } catch (e) { setPill(L("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server"), false); }
-    }
-  }, 600);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId, dirty: isDirty() })); } catch (e) {}
+    if (serverMode() && autoSave && isDirty()) saveNow(); else updateSaveUI();
+  }, autoSave ? 600 : 150);
 }
+async function saveNow() {
+  if (!serverMode() || saving) return;
+  if (!isDirty()) { updateSaveUI(); return; }
+  const json = JSON.stringify(doc), id = docId;
+  saving = true; updateSaveUI(); setPill(L("กำลังบันทึก…", "Saving…"), true);
+  try {
+    const r = await apiFetch("diagrams/" + encodeURIComponent(id), { method: "PUT", body: doc });
+    saving = false;
+    if (r.ok && id === docId) { markSaved(json); try { localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId, dirty: isDirty() })); } catch (e) {} }
+    else updateSaveUI();
+    if (!isDirty()) setPill(r.ok ? L("บันทึกบนเซิร์ฟเวอร์แล้ว", "Saved to server") : L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")", r.ok);
+    else if (!r.ok) { setPill(L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")", false); toast(L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")"); }
+    else if (autoSave) persist();
+  } catch (e) {
+    saving = false; updateSaveUI();
+    setPill(L("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server"), false);
+    toast(L("บันทึกไม่สำเร็จ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Save failed: can't reach the server"));
+  }
+}
+// ask before throwing away unsaved changes (open another diagram, new diagram, sign out)
+function okToLeave() {
+  return !isDirty() || confirm(L("ผังนี้มีการแก้ไขที่ยังไม่บันทึก ต้องการทิ้งการแก้ไขนั้นหรือไม่?", "This diagram has unsaved changes. Discard them?"));
+}
+$("#saveBtn").onclick = () => saveNow();
+$("#autoSave").onchange = (e) => {
+  autoSave = e.target.checked;
+  try { localStorage.setItem("netplan.autosave", autoSave ? "1" : "0"); } catch (err) {}
+  if (autoSave && isDirty()) saveNow(); else updateSaveUI();
+};
+window.addEventListener("beforeunload", (e) => { if (isDirty() && !autoSave) { e.preventDefault(); e.returnValue = ""; } });
 function setPill(text, on) {
   const p = $("#serverPill");
   p.classList.toggle("on", !!on);
@@ -815,7 +870,7 @@ function zoomAt(factor, cx, cy) {
 }
 function bbox(d = doc) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const n of d.nodes) { x0 = Math.min(x0, n.x - 70); x1 = Math.max(x1, n.x + 70); y0 = Math.min(y0, n.y - 40); y1 = Math.max(y1, n.y + 68); }
+  for (const n of d.nodes) { x0 = Math.min(x0, n.x - 70); x1 = Math.max(x1, n.x + 70); y0 = Math.min(y0, n.y - 40); y1 = Math.max(y1, n.y + (roleOf(n) ? 82 : 68)); }
   for (const z of d.zones) { x0 = Math.min(x0, z.x); y0 = Math.min(y0, z.y - 6); x1 = Math.max(x1, z.x + z.w); y1 = Math.max(y1, z.y + z.h); }
   if (!isFinite(x0)) return { x: 0, y: 0, w: 800, h: 500 };
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
@@ -969,7 +1024,7 @@ function routeOnce(l, starts, goals, used, pad) {
   }
   for (const n of doc.nodes) {
     if (n.id === l.from || n.id === l.to) continue;
-    obs.push({ x0: n.x - 34, y0: n.y - 34, x1: n.x + 34, y1: n.y + 64 });
+    obs.push({ x0: n.x - 34, y0: n.y - 34, x1: n.x + 34, y1: n.y + (roleOf(n) ? 78 : 64) });
   }
   const win = obs.filter((o) => o.x1 > wx0 && o.x0 < wx1 && o.y1 > wy0 && o.y0 < wy1);
   for (const p of ends) for (const o of win) if (p.x > o.x0 && p.x < o.x1 && p.y > o.y0 && p.y < o.y1) {
@@ -1218,6 +1273,8 @@ function diagramMarkup(opts = {}) {
     out += `<text class="nlabel" y="44" text-anchor="middle">${esc(n.name || TYPES[n.type].label)}</text>`;
     const sub = n.ip || (n.vlan ? "VLAN " + n.vlan : "");
     if (sub) out += `<text class="nip" y="59" text-anchor="middle">${esc(sub)}</text>`;
+    const role = roleOf(n);
+    if (role) out += `<text class="nrole" y="${sub ? 74 : 59}" text-anchor="middle">${esc(role)}</text>`;
     out += `</g>`;
   }
   // grips on the selected right-angle link: drag one (or the line itself) to shift that run
@@ -1314,6 +1371,8 @@ const STATIC_TEXT = [
   ["#exportSel", "aria-label", "ส่งออก", "Export"], ['#exportSel option[value=""]', "text", "ส่งออก…", "Export…"],
   ['#exportSel option[value="png"]', "text", "รูปภาพ PNG", "PNG image"], ['#exportSel option[value="svg"]', "text", "รูปภาพ SVG", "SVG image"],
   ['#exportSel option[value="csv"]', "text", "รายการอุปกรณ์ CSV", "Device list (CSV)"], ['#exportSel option[value="json"]', "text", "ไฟล์ผัง JSON", "Diagram file (JSON)"],
+  ["#saveBtn span", "text", "บันทึก", "Save"], ["#saveBtn", "title", "บันทึก (Ctrl+S)", "Save (Ctrl+S)"],
+  ["label.autosave span", "text", "อัตโนมัติ", "Auto"], ["label.autosave", "title", "บันทึกขึ้นเซิร์ฟเวอร์ให้เองทุกครั้งที่แก้ไข", "Save to the server by itself after every change"],
   ["#newBtn", "text", "ผังใหม่", "New"], ["#newBtn", "title", "เริ่มผังใหม่", "Start a new diagram"],
   ["#palette", "aria-label", "อุปกรณ์", "Devices"], ["#canvas", "aria-label", "พื้นที่วาดผังเครือข่าย", "Network diagram canvas"],
   ["#searchInput", "placeholder", "ค้นหาชื่อ, IP, VLAN, MAC, รุ่น…", "Search name, IP, VLAN, MAC, model…"],
@@ -1915,6 +1974,7 @@ document.addEventListener("keydown", (e) => {
   }
   const typing = e.target.matches("input,textarea,select");
   const mod = e.ctrlKey || e.metaKey;
+  if (mod && k === "s") { e.preventDefault(); if (serverMode()) saveNow(); else toast(L("ผังนี้บันทึกในเบราว์เซอร์ให้อัตโนมัติอยู่แล้ว", "This diagram is saved in this browser automatically")); return; }
   if (!canEdit && !typing && ((mod && "zyda".includes(k)) || e.key === "Delete" || e.key === "Backspace" || e.key.startsWith("Arrow") || k === "c" || k === "z")) return;
   if (mod && k === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && k === "y" && !typing) { e.preventDefault(); redo(); return; }
@@ -1977,7 +2037,7 @@ newBtn.addEventListener("click", async () => {
 });
 async function newDiagram() {
   if (!canEdit) return;
-  if (server) { await createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] }); return; }
+  if (server) { if (!okToLeave()) return; await createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] }); return; }
   checkpoint();
   doc = { version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] };
   sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView();
@@ -2001,6 +2061,7 @@ async function saveFile(filename, data, mime) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 const EXPORT_CSS = `.nlabel{font:600 12.5px 'NetPlan Sans','Noto Sans Thai',Tahoma,sans-serif;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.nrole{font:italic 500 10.5px 'NetPlan Sans',system-ui,sans-serif;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
 .nip{font:500 11px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
 .llabel{font:500 11px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
 .lport{font:500 10px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
@@ -2120,8 +2181,10 @@ async function createOnServer(d, keepDoc) {
     const r = await apiFetch("diagrams", { method: "POST", body: d });
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
-    if (!keepDoc) { checkpoint(); doc = normalize(d); sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView(); }
-    docId = j.id; persist(); closeModals();
+    if (!keepDoc) { checkpoint(); doc = normalize(d); sel = null; }
+    docId = j.id; markSaved(JSON.stringify(keepDoc ? d : doc));
+    if (!keepDoc) { afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView(); } else persist();
+    closeModals();
     toast(L("สร้างผังบนเซิร์ฟเวอร์แล้ว", "Diagram created on the server"));
   } catch (e) { toast(L("สร้างผังบนเซิร์ฟเวอร์ไม่สำเร็จ", "Couldn't create the diagram on the server")); }
 }
@@ -2136,14 +2199,15 @@ async function openFiles() {
   } catch (e) { box.innerHTML = `<p class="muted">${L("โหลดรายการไม่ได้ ตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่", "Couldn't load the list. Check that the server is running.")}</p>`; }
 }
 $("#filesBtn").onclick = openFiles;
-$("#filesNew").onclick = () => createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] });
+$("#filesNew").onclick = () => okToLeave() && createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] });
 $("#filesList").addEventListener("click", async (e) => {
   const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
   if (o) {
     try {
       const r = await apiFetch("diagrams/" + encodeURIComponent(o.dataset.open));
       const j = normalize(await r.json());
-      doc = j; docId = o.dataset.open; undoStack = []; redoStack = []; sel = null; afterDocSwap(); fit(); closeModals();
+      if (o.dataset.open !== docId && !okToLeave()) return;
+      doc = j; docId = o.dataset.open; undoStack = []; redoStack = []; sel = null; markSaved(); afterDocSwap(); fit(); closeModals();
     } catch (err) { toast(L("เปิดผังไม่ได้", "Couldn't open the diagram")); }
   }
   if (d) {
@@ -2390,6 +2454,8 @@ $("#userMenuBody").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-um]"); if (!b) return;
   $("#userMenu").open = false;
   if (b.dataset.um === "logout") {
+    if (!okToLeave()) return;
+    savedJson = null;
     await postJson("auth/logout", {});
     try { localStorage.removeItem(LS_KEY); } catch (err) {}
     location.replace(location.pathname); return;
@@ -2628,12 +2694,20 @@ function boot() {
     try {
       if (docId) {
         const r = await apiFetch("diagrams/" + encodeURIComponent(docId));
-        if (r.ok) { doc = normalize(await r.json()); afterDocSwap(); fit(); return; }
+        if (r.ok) {
+          const fromServer = normalize(await r.json());
+          markSaved(JSON.stringify(fromServer));
+          // unsaved edits left in this browser last time are kept, waiting for Save
+          if (saved && saved.dirty && saved.docId === docId && canEdit && JSON.stringify(doc) !== savedJson) {
+            toast(L("กู้คืนการแก้ไขที่ยังไม่ได้บันทึกจากครั้งก่อนแล้ว กด บันทึก เพื่อเก็บขึ้นเซิร์ฟเวอร์", "Restored unsaved changes from last time. Press Save to keep them on the server."));
+          } else doc = fromServer;
+          afterDocSwap(); fit(); return;
+        }
       }
       const list = await (await apiFetch("diagrams")).json();
       if (list.length) {
         const r = await apiFetch("diagrams/" + encodeURIComponent(list[0].id));
-        doc = normalize(await r.json()); docId = list[0].id; afterDocSwap(); fit();
+        doc = normalize(await r.json()); docId = list[0].id; markSaved(); afterDocSwap(); fit();
       } else {
         await createOnServer(doc, true);
       }
