@@ -1593,14 +1593,16 @@ function renderInspector() {
       <li><b>โซน / VLAN</b> กด “วาดโซน” (Z) แล้วลากเป็นกรอบ</li>
       <li><b>เลื่อนผัง</b> ลากพื้นที่ว่าง · หรือหมุนล้อเมาส์ (Shift+ล้อ เลื่อนซ้าย-ขวา) · <b>ซูม</b> Ctrl+ล้อเมาส์</li>
       <li><b>เลือกหลายชิ้น</b> Shift+คลิก, Shift+ลากกรอบ หรือ Ctrl+A แล้วลากย้ายหรือเปลี่ยนสีพร้อมกัน</li>
-      <li><b>ลบ</b> Delete · <b>ย้อน</b> Ctrl+Z · <b>สำเนา</b> Ctrl+D · <b>ค้นหา</b> Ctrl+F</li>`, `
+      <li><b>ลบ</b> Delete · <b>ย้อน</b> Ctrl+Z · <b>สำเนา</b> Ctrl+D · <b>ค้นหา</b> Ctrl+F</li>
+      <li><b>ตัด / คัดลอก / วาง</b> Ctrl+X / Ctrl+C / Ctrl+V (วางตรงตำแหน่งเมาส์ ใช้กับหลายชิ้นได้ และวางข้ามผังได้)</li>`, `
       <li><b>Add a device</b> click or drag it from the left panel</li>
       <li><b>Add details</b> click a device and fill in this panel</li>
       <li><b>Connect</b> press “Connect” (C) and drag from one device or zone to another, or click one then the other</li>
       <li><b>Zone / VLAN</b> press “Draw zone” (Z) and drag a box</li>
       <li><b>Pan</b> drag empty space · or use the mouse wheel (Shift+wheel for sideways) · <b>Zoom</b> Ctrl+wheel</li>
       <li><b>Pick several</b> Shift+click, Shift+drag a box or Ctrl+A, then move or recolor them together</li>
-      <li><b>Delete</b> Delete · <b>Undo</b> Ctrl+Z · <b>Duplicate</b> Ctrl+D · <b>Search</b> Ctrl+F</li>`)}
+      <li><b>Delete</b> Delete · <b>Undo</b> Ctrl+Z · <b>Duplicate</b> Ctrl+D · <b>Search</b> Ctrl+F</li>
+      <li><b>Cut / copy / paste</b> Ctrl+X / Ctrl+C / Ctrl+V (pastes at the mouse, works with several items and across diagrams)</li>`)}
     </ul>`;
   }
   inspector.innerHTML = closeBtnHtml() + h;
@@ -1735,6 +1737,81 @@ function duplicate() {
   n.id = uid("n"); n.x += 40; n.y += 40; n.name = nextName(n.type); n.ip = ""; n.mac = ""; n.serial = "";
   doc.nodes.push(n); sel = { kind: "node", id: n.id };
   render(); renderInspector(); persist();
+}
+/* ---------- Cut / copy / paste (Ctrl+X / C / V) ---------- */
+// The clipboard holds the picked devices and zones (plus devices inside picked zones) and the links
+// between them. It is kept in this browser, so it can be pasted into another diagram too.
+const CLIP_KEY = "netplan.clip";
+let clip = null, pasteCount = 0, mouseWorld = null;
+svg.addEventListener("pointermove", (e) => { mouseWorld = toWorld(e); });
+svg.addEventListener("pointerleave", () => { mouseWorld = null; });
+function copySelection() {
+  const ks = selectedKeys();
+  if (!ks.size) return 0;
+  const nodeIds = new Set(), zoneIds = new Set();
+  for (const k of ks) {
+    if (k[0] === "n") nodeIds.add(k.slice(2));
+    else {
+      const z = findZone(k.slice(2)); if (!z) continue; zoneIds.add(z.id);
+      for (const n of doc.nodes) if (n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h) nodeIds.add(n.id);
+    }
+  }
+  const ids = new Set([...nodeIds, ...zoneIds]);
+  clip = JSON.parse(JSON.stringify({
+    nodes: doc.nodes.filter((n) => nodeIds.has(n.id)),
+    zones: doc.zones.filter((z) => zoneIds.has(z.id)),
+    links: doc.links.filter((l) => ids.has(l.from) && ids.has(l.to)),
+  }));
+  pasteCount = 0;
+  try { localStorage.setItem(CLIP_KEY, JSON.stringify(clip)); } catch (e) {}
+  return clip.nodes.length + clip.zones.length;
+}
+function cutSelection() {
+  const c = copySelection(); if (!c) return;
+  clip.cut = true;
+  try { localStorage.setItem(CLIP_KEY, JSON.stringify(clip)); } catch (e) {}
+  if (sel && sel.kind === "zone" && clip.nodes.length) setSelection([...clip.zones.map((z) => keyOf("zone", z.id)), ...clip.nodes.map((n) => keyOf("node", n.id))]);
+  else if (multi.size >= 2) setSelection([...multi, ...clip.nodes.map((n) => keyOf("node", n.id))]);
+  deleteSelected();
+  toast(L(`ตัดแล้ว ${c} ชิ้น กด Ctrl+V เพื่อวาง`, `Cut ${c} item(s). Press Ctrl+V to paste.`));
+}
+function pasteClip() {
+  let c = null;
+  try { c = JSON.parse(localStorage.getItem(CLIP_KEY) || "null"); } catch (e) {}
+  if (!c) c = clip;
+  if (!c || !(c.nodes?.length || c.zones?.length)) return;
+  if (!clip || JSON.stringify(c) !== JSON.stringify(clip)) { clip = c; pasteCount = 0; }
+  // place it under the mouse when the mouse is on the canvas, otherwise just beside the original
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of c.nodes) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }
+  for (const z of c.zones) { x0 = Math.min(x0, z.x); y0 = Math.min(y0, z.y); x1 = Math.max(x1, z.x + z.w); y1 = Math.max(y1, z.y + z.h); }
+  let dx, dy;
+  if (mouseWorld) { dx = snap(mouseWorld.x - (x0 + x1) / 2); dy = snap(mouseWorld.y - (y0 + y1) / 2); }
+  else { const step = (c.cut ? pasteCount : pasteCount + 1) * 40; dx = step; dy = step; }
+  pasteCount++;
+  checkpoint();
+  const map = new Map(), keys = [];
+  const names = new Set(doc.nodes.map((n) => n.name));
+  for (const z0 of c.zones) {
+    const z = JSON.parse(JSON.stringify(z0)); z.id = uid("z"); z.x += dx; z.y += dy;
+    map.set(z0.id, z.id); doc.zones.push(z); keys.push(keyOf("zone", z.id));
+  }
+  for (const n0 of c.nodes) {
+    const n = JSON.parse(JSON.stringify(n0)); n.id = uid("n"); n.x += dx; n.y += dy;
+    // a copy next to its original gets a new name and empty IP / MAC / serial, like Duplicate
+    if (n.name && names.has(n.name)) { n.name = nextName(n.type); n.ip = ""; n.mac = ""; n.serial = ""; }
+    names.add(n.name);
+    map.set(n0.id, n.id); doc.nodes.push(n); keys.push(keyOf("node", n.id));
+  }
+  for (const l0 of c.links) {
+    const l = JSON.parse(JSON.stringify(l0)); l.id = uid("l"); l.from = map.get(l0.from); l.to = map.get(l0.to);
+    if (!l.from || !l.to) continue;
+    if (l.bends) l.bends = l.bends.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+    doc.links.push(l);
+  }
+  doc = normalize(doc);
+  setSelection(keys); render(); renderInspector(); persist();
+  toast(L(`วางแล้ว ${keys.length} ชิ้น`, `Pasted ${keys.length} item(s)`));
 }
 function addLink(from, to) {
   if (from === to) return;
@@ -1975,10 +2052,15 @@ document.addEventListener("keydown", (e) => {
   const typing = e.target.matches("input,textarea,select");
   const mod = e.ctrlKey || e.metaKey;
   if (mod && k === "s") { e.preventDefault(); if (serverMode()) saveNow(); else toast(L("ผังนี้บันทึกในเบราว์เซอร์ให้อัตโนมัติอยู่แล้ว", "This diagram is saved in this browser automatically")); return; }
-  if (!canEdit && !typing && ((mod && "zyda".includes(k)) || e.key === "Delete" || e.key === "Backspace" || e.key.startsWith("Arrow") || k === "c" || k === "z")) return;
+  if (!canEdit && !typing && ((mod && "zydaxv".includes(k)) || e.key === "Delete" || e.key === "Backspace" || e.key.startsWith("Arrow") || k === "c" || k === "z")) return;
   if (mod && k === "z" && !typing) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && k === "y" && !typing) { e.preventDefault(); redo(); return; }
   if (mod && k === "d" && !typing) { e.preventDefault(); duplicate(); return; }
+  if (mod && !typing && !e.shiftKey && !e.altKey && window.getSelection && !String(window.getSelection())) {
+    if (k === "c" && selectedKeys().size) { e.preventDefault(); const c = copySelection(); toast(L(`คัดลอกแล้ว ${c} ชิ้น กด Ctrl+V เพื่อวาง`, `Copied ${c} item(s). Press Ctrl+V to paste.`)); return; }
+    if (k === "x" && selectedKeys().size) { e.preventDefault(); cutSelection(); return; }
+    if (k === "v") { e.preventDefault(); pasteClip(); return; }
+  }
   if (mod && k === "a" && !typing) {
     e.preventDefault();
     setSelection([...doc.nodes.map((n) => keyOf("node", n.id)), ...doc.zones.map((z) => keyOf("zone", z.id))]);
