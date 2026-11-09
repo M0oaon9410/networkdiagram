@@ -4,6 +4,6 @@
   "description": "Network diagram editor with device details",
   "main": "server.js",
   "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=22" },
   "license": "MIT"
 }

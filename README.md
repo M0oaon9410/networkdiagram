@@ -55,7 +55,7 @@ docker run --rm -v netplan_netplan-data:/data -v "$PWD":/backup alpine tar czf /
 
 ## รันโดยไม่ใช้ Docker
 
-ต้องมี Node.js 18 ขึ้นไป ไม่ต้องติดตั้งแพ็กเกจเพิ่ม
+ต้องมี Node.js 22 ขึ้นไป (แนะนำ 24 LTS ซึ่งยังได้รับแพตช์ความปลอดภัย) ไม่ต้องติดตั้งแพ็กเกจเพิ่ม
 
 ```bash
 node server.js        # ข้อมูลเก็บที่โฟลเดอร์ ./data
