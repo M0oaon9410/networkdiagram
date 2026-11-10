@@ -21,6 +21,8 @@ const CAN_EDIT = ["admin", "editor"];
 const CAN_VIEW = ["admin", "editor", "viewer"];
 // Everything the page needs is served from here; no framing by other sites; tokens in URLs never leak via Referer.
 const SECURITY_HEADERS = {
+  // HSTS: browsers that reached us over HTTPS stay on HTTPS for a year (ignored on plain HTTP, per RFC 6797)
+  "Strict-Transport-Security": "max-age=31536000",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
@@ -190,7 +192,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && parts[0] === "fonts" && parts.length === 2 && FONT_RE.test(parts[1])) {
       try {
         const buf = await fsp.readFile(path.join(PUBLIC_DIR, "fonts", parts[1]));
-        res.writeHead(200, { "Content-Type": parts[1].endsWith(".woff2") ? "font/woff2" : "text/plain; charset=utf-8", "Content-Length": buf.length, "Cache-Control": "public, max-age=604800" });
+        res.writeHead(200, { "Content-Type": parts[1].endsWith(".woff2") ? "font/woff2" : "text/plain; charset=utf-8", "Content-Length": buf.length, "Cache-Control": "public, max-age=604800", ...SECURITY_HEADERS });
         return res.end(buf);
       } catch (e) { return send(res, 404, "Not found", "text/plain; charset=utf-8"); }
     }

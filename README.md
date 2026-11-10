@@ -95,11 +95,12 @@ API ต้องเข้าสู่ระบบก่อน (cookie `np_sid`) 
 
 ## ความปลอดภัย
 
-สิ่งที่โปรแกรมทำให้แล้ว: รหัสผ่านเก็บแบบ scrypt, cookie แบบ HttpOnly + SameSite, ตรวจสิทธิ์ทุกคำขอที่ฝั่งเซิร์ฟเวอร์, กันการเดารหัสผ่าน (ผิด 10 ครั้งพัก 15 นาที), จำกัดการส่งอีเมลไม่เกิน 10 ครั้งต่อชั่วโมงต่อ IP, ส่ง header ความปลอดภัย (Content-Security-Policy, X-Frame-Options, Referrer-Policy) และไม่ให้คนสมัครใหม่เห็นผังจนกว่าผู้ดูแลระบบอนุมัติ
+สิ่งที่โปรแกรมทำให้แล้ว: รหัสผ่านเก็บแบบ scrypt, cookie แบบ HttpOnly + SameSite, ตรวจสิทธิ์ทุกคำขอที่ฝั่งเซิร์ฟเวอร์, กันการเดารหัสผ่าน (ผิด 10 ครั้งพัก 15 นาที), จำกัดการส่งอีเมลไม่เกิน 10 ครั้งต่อชั่วโมงต่อ IP, ส่ง header ความปลอดภัย (Strict-Transport-Security/HSTS, Content-Security-Policy, X-Frame-Options, Referrer-Policy) และไม่ให้คนสมัครใหม่เห็นผังจนกว่าผู้ดูแลระบบอนุมัติ
 
 สิ่งที่ผู้ติดตั้งต้องทำเมื่อเปิดให้ใช้ผ่านอินเทอร์เน็ต:
 
 1. **ใช้ HTTPS** วาง reverse proxy (เช่น Nginx, Caddy หรือ Cloudflare) ที่มีใบรับรอง SSL ไว้ข้างหน้า และให้ proxy ส่ง header `X-Forwarded-Proto: https` แล้วเปลี่ยน “ที่อยู่เว็บที่ใส่ในลิงก์อีเมล” เป็น `https://...`
+   - ตั้งให้ proxy รับเฉพาะ TLS 1.2 ขึ้นไป (ปิด TLS 1.0/1.1) ถ้าใช้ Cloudflare: SSL/TLS → Edge Certificates → Minimum TLS Version = TLS 1.2 และเปิด Always Use HTTPS
 2. **ปิดพอร์ตตรง** ให้เข้าได้ผ่าน proxy เท่านั้น เช่น ผูกพอร์ตไว้ที่ `127.0.0.1:9000:8080` ใน docker-compose หรือปิดด้วย firewall
 3. **สำรองข้อมูล** volume `netplan-data` เป็นประจำ (มีทั้งผังและบัญชีผู้ใช้)
 4. ตั้งรหัสผ่าน admin ให้ยาว และอัปเดตระบบปฏิบัติการ/Docker สม่ำเสมอ
