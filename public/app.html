@@ -1537,7 +1537,7 @@ function renderInspector() {
     h += field(L("ยี่ห้อ", "Vendor"), "vendor", n.vendor);
     h += field(L("รุ่น", "Model"), "model", n.model);
     h += field(L("หมายเลขซีเรียล", "Serial no."), "serial", n.serial);
-    h += field("Platform", "platform", n.platform || "", { type: "select", options: [["", L("— ไม่ระบุ —", "— none —")], ...PLATFORMS.map((v) => [v, v]), ...(n.platform && !PLATFORMS.includes(n.platform) ? [[n.platform, n.platform]] : [])] });
+    h += field("Hypervisor / Virtualization Platform", "platform", n.platform || "", { full: true, type: "select", options: [["", L("— ไม่ระบุ —", "— none —")], ...PLATFORMS.map((v) => [v, v]), ...(n.platform && !PLATFORMS.includes(n.platform) ? [[n.platform, n.platform]] : [])] });
     h += osField(n.os);
     h += siteField(n.location);
     h += `</div><div class="sec">${L("เฉพาะ", "")} ${esc(t.label)}${L("", " details")}</div><div class="fields">`;
@@ -2214,7 +2214,7 @@ function exportPNG() {
   }));
 }
 function exportCSV() {
-  const cols = [["name", L("ชื่อ", "Name")], ["type", L("ชนิด", "Type")], ["status", L("สถานะ", "Status")], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["vendor", L("ยี่ห้อ", "Vendor")], ["model", L("รุ่น", "Model")], ["serial", "Serial"], ["platform", "Platform"], ["os", "OS/Firmware"], ["location", L("สถานที่ติดตั้ง", "Installation site")], ["extra", L("ข้อมูลเฉพาะ", "Type details")], ["custom", L("ฟิลด์เพิ่มเติม", "Custom fields")], ["links", L("เชื่อมต่อกับ", "Connected to")], ["notes", L("หมายเหตุ", "Notes")]];
+  const cols = [["name", L("ชื่อ", "Name")], ["type", L("ชนิด", "Type")], ["status", L("สถานะ", "Status")], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["vendor", L("ยี่ห้อ", "Vendor")], ["model", L("รุ่น", "Model")], ["serial", "Serial"], ["platform", "Hypervisor / Virtualization Platform"], ["os", "OS/Firmware"], ["location", L("สถานที่ติดตั้ง", "Installation site")], ["extra", L("ข้อมูลเฉพาะ", "Type details")], ["custom", L("ฟิลด์เพิ่มเติม", "Custom fields")], ["links", L("เชื่อมต่อกับ", "Connected to")], ["notes", L("หมายเหตุ", "Notes")]];
   const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
   const rows = [cols.map((c) => q(c[1])).join(",")];
   for (const n of doc.nodes) {
@@ -2325,7 +2325,7 @@ const normText = (s) => String(s ?? "").normalize("NFC").toLocaleLowerCase("th")
 function searchFields(n) {
   const t = TYPES[n.type];
   const f = [["", n.name], [L("ชนิด", "Type"), t.label], ["IP", n.ip], ["Subnet", n.mask], ["Gateway", n.gateway], ["VLAN", n.vlan], ["MAC", n.mac],
-    [L("ยี่ห้อ", "Vendor"), n.vendor], [L("รุ่น", "Model"), n.model], ["Serial", n.serial], ["Platform", n.platform], ["OS", n.os], [L("สถานที่ติดตั้ง", "Installation site"), n.location], [L("สถานะ", "Status"), STATUS[n.status]?.label], [L("หมายเหตุ", "Notes"), n.notes]];
+    [L("ยี่ห้อ", "Vendor"), n.vendor], [L("รุ่น", "Model"), n.model], ["Serial", n.serial], ["Hypervisor", n.platform], ["OS", n.os], [L("สถานที่ติดตั้ง", "Installation site"), n.location], [L("สถานะ", "Status"), STATUS[n.status]?.label], [L("หมายเหตุ", "Notes"), n.notes]];
   for (const k of t.extra) f.push([EXTRA_LABELS[k] || k, n.extra[k]]);
   for (const c of n.custom) f.push([c.k || L("ฟิลด์", "Field"), c.v], [L("ฟิลด์", "Field"), c.k]);
   return f.filter(([, v]) => v);
@@ -2660,7 +2660,7 @@ const AUDIT_ACTIONS = {
 };
 const AUDIT_FIELDS = {
   name: ["ชื่อ", "name"], type: ["ชนิด", "type"], ip: ["IP", "IP"], mask: ["Subnet", "subnet"], gateway: ["Gateway", "gateway"], vlan: ["VLAN", "VLAN"],
-  mac: ["MAC", "MAC"], vendor: ["ยี่ห้อ", "vendor"], model: ["รุ่น", "model"], serial: ["Serial", "serial"], platform: ["Platform", "platform"], os: ["OS", "OS"], location: ["สถานที่ติดตั้ง", "installation site"],
+  mac: ["MAC", "MAC"], vendor: ["ยี่ห้อ", "vendor"], model: ["รุ่น", "model"], serial: ["Serial", "serial"], platform: ["Hypervisor / Virtualization Platform", "hypervisor / virtualization platform"], os: ["OS", "OS"], location: ["สถานที่ติดตั้ง", "installation site"],
   status: ["สถานะ", "status"], notes: ["หมายเหตุ", "notes"], color: ["สี", "color"], custom: ["ฟิลด์เพิ่มเติม", "custom fields"], kind: ["ชนิดสาย", "cable type"],
   label: ["ป้ายบนสาย", "label"], fromPort: ["พอร์ตต้นทาง", "port A"], toPort: ["พอร์ตปลายทาง", "port B"], route: ["รูปแบบเส้น", "line style"], ends: ["ปลายสาย", "ends"],
 };
