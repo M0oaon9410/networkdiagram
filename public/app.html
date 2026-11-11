@@ -522,7 +522,7 @@ const STATUS = {
   active: { label: "ใช้งานอยู่", color: "#2f9e5a" },
   planned: { label: "วางแผน / ยังไม่ติดตั้ง", color: "#3b7ddd" },
   maint: { label: "ซ่อมบำรุง", color: "#e0a019" },
-  down: { label: "ใช้งานไม่ได้", color: "#d64535" },
+  down: { label: "ไม่ได้ใช้งาน", color: "#d64535" },
 };
 const LINKS = {
   eth:   { label: "Ethernet (UTP)", color: null,      width: 2,   dash: "" },
@@ -532,7 +532,7 @@ const LINKS = {
   wifi:  { label: "Wireless",       color: "#7a4fb8", width: 2,   dash: "2 5" },
   stack: { label: "Stack / HA",     color: "#2f7a4c", width: 4.5, dash: "" },
 };
-bilingual(STATUS, { active: ["ใช้งานอยู่", "Active"], planned: ["วางแผน / ยังไม่ติดตั้ง", "Planned / not installed"], maint: ["ซ่อมบำรุง", "Maintenance"], down: ["ใช้งานไม่ได้", "Down"] });
+bilingual(STATUS, { active: ["ใช้งานอยู่", "Active"], planned: ["วางแผน / ยังไม่ติดตั้ง", "Planned / not installed"], maint: ["ซ่อมบำรุง", "Maintenance"], down: ["ไม่ได้ใช้งาน", "Not in use"] });
 bilingual(LINKS, {
   eth: ["สาย LAN (UTP)", "Ethernet (UTP)"], fiber: ["ไฟเบอร์", "Fiber"], wan: ["WAN / ลีสด์ไลน์", "WAN / Leased line"],
   vpn: ["VPN / อุโมงค์", "VPN / Tunnel"], wifi: ["ไร้สาย", "Wireless"], stack: ["Stack / HA", "Stack / HA"],
@@ -1269,7 +1269,8 @@ function diagramMarkup(opts = {}) {
     out += `<rect x="-26" y="-26" width="52" height="52" rx="11" fill="${c}"${planned ? ` fill-opacity=".55" stroke="${c}" stroke-width="2" stroke-dasharray="5 3"` : ""}/>`;
     out += glyph(n.type, 32, -16, -16, inkFor(c));
     const st = STATUS[n.status];
-    if (st && n.status !== "active") out += `<circle class="statdot" cx="22" cy="-22" r="5.5" fill="${st.color}"/>`;
+    // status dot on every device: green in use, blue planned, amber maintenance, red not in use
+    if (st) out += `<circle class="statdot" cx="22" cy="-22" r="5.5" fill="${st.color}"><title>${esc(st.label)}</title></circle>`;
     out += `<text class="nlabel" y="44" text-anchor="middle">${esc(n.name || TYPES[n.type].label)}</text>`;
     const sub = n.ip || (n.vlan ? "VLAN " + n.vlan : "");
     if (sub) out += `<text class="nip" y="59" text-anchor="middle">${esc(sub)}</text>`;
