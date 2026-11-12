@@ -83,7 +83,7 @@ async function listDiagrams() {
   for (const f of files) {
     try {
       const d = JSON.parse(await fsp.readFile(path.join(DATA_DIR, f), "utf8"));
-      out.push({ id: f.slice(0, -5), title: d.title || "(ไม่มีชื่อ)", nodes: (d.nodes || []).length, updatedAt: d.updatedAt || null, updatedBy: d.updatedBy || null });
+      out.push({ id: f.slice(0, -5), title: d.title || "(ไม่มีชื่อ)", area: typeof d.area === "string" ? d.area.slice(0, 80) : "", nodes: (d.nodes || []).length, updatedAt: d.updatedAt || null, updatedBy: d.updatedBy || null });
     } catch (e) { /* skip unreadable file */ }
   }
   return out.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));

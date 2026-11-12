@@ -229,7 +229,16 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .note { border-radius: 8px; padding: 9px 11px; font-size: 13.5px; line-height: 1.55; border: 1px solid var(--line); background: var(--panel-2); }
 .note.err { border-color: var(--danger); color: var(--danger); }
 .note.ok { border-color: #2f9e5a; }
-.usermenu { position: relative; }
+.usermenu, .areamenu { position: relative; }
+.areamenu summary { list-style: none; max-width: 260px; }
+.areamenu summary::-webkit-details-marker { display: none; }
+.areamenu summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.areamenu .menu { position: absolute; left: 0; top: calc(100% + 6px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; min-width: 280px; max-width: min(420px, 92vw); max-height: 70vh; overflow: auto; display: grid; gap: 2px; z-index: 40; box-shadow: 0 8px 24px rgb(0 0 0 / .14); }
+.areamenu .menu h4 { margin: 8px 8px 2px; font-size: 12px; color: var(--muted); font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+.areamenu .menu h4:first-child { margin-top: 2px; }
+.areamenu .menu .btn { border: none; justify-content: flex-start; width: 100%; white-space: normal; text-align: left; }
+.areamenu .menu .btn.current { background: var(--panel-2); font-weight: 600; }
+.area-head { margin: 10px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .usermenu summary { list-style: none; }
 .usermenu summary::-webkit-details-marker { display: none; }
 .usermenu .avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
@@ -302,6 +311,7 @@ body.insp-hidden { --insp-w: 0px; }
       NetPlan
     </div>
     <input id="docTitle" class="title-input" aria-label="ชื่อผัง" maxlength="120">
+    <details class="areamenu" id="areaMenu" hidden><summary class="btn" title="เรียกดูผังตามพื้นที่"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg><span id="areaLabel">พื้นที่</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="m6 9 6 6 6-6"/></svg></summary><div class="menu" id="areaMenuBody"></div></details>
     <div class="sep hide-sm"></div>
     <div class="grp" role="group" aria-label="โหมด">
       <button class="btn edit-only" id="modeSelect" data-mode="select" title="เลือก / ย้าย (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg>เลือก/ย้าย</button>
@@ -397,6 +407,7 @@ body.insp-hidden { --insp-w: 0px; }
 <div class="overlay" id="filesModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="filesTitle">
     <h2 id="filesTitle">ผังที่บันทึกไว้บนเซิร์ฟเวอร์</h2>
+    <div class="f"><label for="filesArea">พื้นที่</label><select id="filesArea"></select></div>
     <div class="list" id="filesList"></div>
     <div class="actions" style="margin:0">
       <button class="btn primary edit-only" id="filesNew">สร้างผังใหม่</button>
@@ -404,6 +415,22 @@ body.insp-hidden { --insp-w: 0px; }
       <button class="btn" data-close>ปิด</button>
     </div>
   </div>
+</div>
+
+<div class="overlay" id="newModal" hidden>
+  <form class="modal" role="dialog" aria-modal="true" aria-labelledby="newTitle" id="newForm" style="width:min(460px,100%)">
+    <h2 id="newTitle">สร้างผังใหม่</h2>
+    <div class="fields" style="grid-template-columns:1fr">
+      <div class="f"><label for="newName">ชื่อผัง</label><input id="newName" maxlength="120" required></div>
+      <div class="f"><label for="newArea">พื้นที่</label><select id="newArea" required></select>
+        <input id="newAreaText" maxlength="80" placeholder="พิมพ์ชื่อพื้นที่ใหม่" style="margin-top:6px" hidden></div>
+    </div>
+    <div class="actions" style="margin:0">
+      <button class="btn primary" type="submit" id="newCreate">สร้างผัง</button>
+      <div class="spacer"></div>
+      <button class="btn" type="button" data-close>ยกเลิก</button>
+    </div>
+  </form>
 </div>
 
 <div class="overlay" id="usersModal" hidden>
@@ -657,7 +684,7 @@ function endAnchor(id, toward) {
 
 function normalize(d) {
   if (!d || typeof d !== "object" || !Array.isArray(d.nodes)) throw new Error(L("ไม่พบรายการอุปกรณ์ (nodes) ในไฟล์", "No devices (nodes) found in the file"));
-  const out = { version: 1, title: String(d.title || L("ผังเครือข่าย", "Network diagram")), nodes: [], links: [], zones: [] };
+  const out = { version: 1, title: String(d.title || L("ผังเครือข่าย", "Network diagram")), area: String(d.area || "").trim().slice(0, 80), nodes: [], links: [], zones: [] };
   // ids end up inside HTML attributes, so anything but plain letters, digits, - and _ gets a fresh id
   const idMap = new Map(), taken = new Set();
   const safeId = (raw, prefix) => {
@@ -709,7 +736,7 @@ function redo() {
 }
 function afterDocSwap() {
   if (sel && !(sel.kind === "node" ? findNode(sel.id) : sel.kind === "link" ? findLink(sel.id) : findZone(sel.id))) sel = null;
-  $("#docTitle").value = doc.title;
+  $("#docTitle").value = doc.title; updateAreaLabel();
   render(); renderInspector(); updateUndoButtons(); persist();
 }
 function updateUndoButtons() {
@@ -1375,6 +1402,9 @@ const STATIC_TEXT = [
   ['#exportSel option[value="csv"]', "text", "รายการอุปกรณ์ CSV", "Device list (CSV)"], ['#exportSel option[value="json"]', "text", "ไฟล์ผัง JSON", "Diagram file (JSON)"],
   ["#saveBtn span", "text", "บันทึก", "Save"], ["#saveBtn", "title", "บันทึก (Ctrl+S)", "Save (Ctrl+S)"],
   ["label.autosave span", "text", "อัตโนมัติ", "Auto"], ["label.autosave", "title", "บันทึกขึ้นเซิร์ฟเวอร์ให้เองทุกครั้งที่แก้ไข", "Save to the server by itself after every change"],
+  ["#areaMenu summary", "title", "เรียกดูผังตามพื้นที่", "Browse diagrams by area"], ["label[for=filesArea]", "text", "พื้นที่", "Area"],
+  ["#newTitle", "text", "สร้างผังใหม่", "New diagram"], ["label[for=newName]", "text", "ชื่อผัง", "Diagram name"], ["label[for=newArea]", "text", "พื้นที่", "Area"],
+  ["#newAreaText", "placeholder", "พิมพ์ชื่อพื้นที่ใหม่", "Type the new area name"], ["#newCreate", "text", "สร้างผัง", "Create"], ["#newForm [data-close]", "text", "ยกเลิก", "Cancel"],
   ["#newBtn", "text", "ผังใหม่", "New"], ["#newBtn", "title", "เริ่มผังใหม่", "Start a new diagram"],
   ["#palette", "aria-label", "อุปกรณ์", "Devices"], ["#canvas", "aria-label", "พื้นที่วาดผังเครือข่าย", "Network diagram canvas"],
   ["#searchInput", "placeholder", "ค้นหาชื่อ, IP, VLAN, MAC, รุ่น…", "Search name, IP, VLAN, MAC, model…"],
@@ -1591,6 +1621,7 @@ function renderInspector() {
     const counts = {};
     for (const n of doc.nodes) counts[n.type] = (counts[n.type] || 0) + 1;
     h += `<div class="insp-head"><div><h2>${esc(doc.title)}</h2><small>${L("อุปกรณ์", "Devices")} ${doc.nodes.length} · ${L("สาย", "Links")} ${doc.links.length} · ${L("โซน", "Zones")} ${doc.zones.length}</small></div></div>`;
+    h += `<div class="fields"><div class="f full"><label for="f_docarea">${L("พื้นที่ของผังนี้", "Area of this diagram")}</label><select id="f_docarea" data-docarea>${areaOptions(doc.area || "", true)}</select><input id="f_docarea_new" data-docarea-new maxlength="80" placeholder="${L("พิมพ์ชื่อพื้นที่ใหม่", "Type the new area name")}" style="margin-top:6px" hidden></div></div>`;
     if (doc.nodes.length) {
       h += `<div class="sec">${L("อุปกรณ์ในผัง", "Devices in this diagram")}</div><div class="stats">`;
       for (const [k, t] of Object.entries(TYPES)) if (counts[k]) h += `<div class="t"><span class="dot" style="background:${CATS[t.cat].color}"></span>${esc(t.label)}</div><div class="n">${counts[k]}</div>`;
@@ -1671,6 +1702,12 @@ inspector.addEventListener("input", (e) => {
       for (const k of multi) if (k[0] === "n") findNode(k.slice(2)).status = el.value;
     }
     render(); persist(); return;
+  }
+  if (el.dataset.docarea != null || el.dataset.docareaNew != null) {
+    const box = inspector.querySelector("#f_docarea_new");
+    if (el.dataset.docarea != null && el.value === "__new") { box.hidden = false; box.focus(); return; }
+    if (el.dataset.docarea != null) { box.hidden = true; box.value = ""; }
+    doc.area = el.value.trim().slice(0, 80); updateAreaLabel(); persist(); return;
   }
   const obj = sel && (sel.kind === "node" ? findNode(sel.id) : sel.kind === "link" ? findLink(sel.id) : findZone(sel.id));
   if (!obj) return;
@@ -2123,21 +2160,93 @@ $("#docTitle").addEventListener("focus", () => (editSnapshot = JSON.stringify(do
 $("#docTitle").addEventListener("input", (e) => { doc.title = e.target.value; persist(); if (!sel) renderInspector(); });
 $("#docTitle").addEventListener("blur", () => { if (editSnapshot && editSnapshot !== JSON.stringify(doc)) { undoStack.push(editSnapshot); redoStack = []; updateUndoButtons(); } editSnapshot = null; });
 
-const newBtn = $("#newBtn");
-newBtn.addEventListener("click", async () => {
-  if (!newBtn.classList.contains("armed")) {
-    newBtn.classList.add("armed"); newBtn.textContent = L("กดอีกครั้งเพื่อล้างผัง", "Click again to clear");
-    clearTimeout(newBtn._t); newBtn._t = setTimeout(() => { newBtn.classList.remove("armed"); newBtn.textContent = L("ผังใหม่", "New"); }, 3500);
-    return;
+/* ---------- Areas ----------
+   Each diagram belongs to an area (a site such as a palace or building). The header menu lists the
+   server's diagrams grouped by area; the area list is the defaults plus every area already in use. */
+const DEFAULT_AREAS = ["พระที่นั่งอัมพรสถาน", "พระบรมมหาราชวัง"];
+let serverList = [];
+async function loadServerList() {
+  try { serverList = await (await apiFetch("diagrams")).json(); } catch (e) { serverList = []; }
+  return serverList;
+}
+function knownAreas() {
+  const set = new Set(DEFAULT_AREAS);
+  for (const x of serverList) if (x.area) set.add(x.area);
+  if (doc.area) set.add(doc.area);
+  return [...set].sort((a, b) => a.localeCompare(b, "th"));
+}
+const NO_AREA = () => L("ไม่ระบุพื้นที่", "No area");
+function updateAreaLabel() {
+  $("#areaLabel").textContent = doc.area || L("พื้นที่", "Area");
+  $("#areaMenu").hidden = !server;
+}
+function groupByArea(list) {
+  const groups = new Map();
+  for (const a of knownAreas()) groups.set(a, []);
+  for (const x of list) { const a = x.area || ""; if (!groups.has(a)) groups.set(a, []); groups.get(a).push(x); }
+  return [...groups].filter(([a, xs]) => xs.length || a);
+}
+async function renderAreaMenu() {
+  const box = $("#areaMenuBody");
+  box.innerHTML = `<p class="muted" style="margin:6px 8px">${L("กำลังโหลด…", "Loading…")}</p>`;
+  const list = await loadServerList();
+  let h = "";
+  for (const [a, xs] of groupByArea(list)) {
+    h += `<h4><span>${esc(a || NO_AREA())}</span><span>${xs.length}</span></h4>`;
+    h += xs.length ? xs.map((x) => `<button class="btn${x.id === docId ? " current" : ""}" type="button" data-open-diagram="${esc(x.id)}">${esc(x.title)}</button>`).join("")
+      : `<p class="muted" style="margin:0 8px 4px;font-size:12.5px">${L("ยังไม่มีผัง", "No diagrams yet")}</p>`;
   }
-  clearTimeout(newBtn._t); newBtn.classList.remove("armed"); newBtn.textContent = L("ผังใหม่", "New");
-  await newDiagram();
+  if (canEdit) h += `<button class="btn" type="button" data-new-diagram style="border-top:1px solid var(--line);border-radius:0;margin-top:4px">+ ${L("สร้างผังใหม่", "New diagram")}</button>`;
+  box.innerHTML = h || `<p class="muted" style="margin:6px 8px">${L("ยังไม่มีผังบนเซิร์ฟเวอร์", "No diagrams on the server yet")}</p>`;
+}
+$("#areaMenu").addEventListener("toggle", () => { if ($("#areaMenu").open) renderAreaMenu(); });
+$("#areaMenuBody").addEventListener("click", (e) => {
+  const o = e.target.closest("[data-open-diagram]"), n = e.target.closest("[data-new-diagram]");
+  if (o) { $("#areaMenu").open = false; openDiagram(o.dataset.openDiagram); }
+  if (n) { $("#areaMenu").open = false; openNewModal(); }
 });
-async function newDiagram() {
+document.addEventListener("click", (e) => { const m = $("#areaMenu"); if (m.open && !m.contains(e.target)) m.open = false; });
+async function openDiagram(id) {
+  try {
+    const r = await apiFetch("diagrams/" + encodeURIComponent(id));
+    if (!r.ok) throw new Error(r.status);
+    const j = normalize(await r.json());
+    if (id !== docId && !okToLeave()) return;
+    doc = j; docId = id; undoStack = []; redoStack = []; sel = null; markSaved(); afterDocSwap(); fit(); closeModals();
+  } catch (err) { toast(L("เปิดผังไม่ได้", "Couldn't open the diagram")); }
+}
+// area picker used by the new-diagram form and the diagram panel: listed areas, or type a new one
+function areaOptions(cur, withNone) {
+  return (withNone ? `<option value="">${L("— ไม่ระบุ —", "— none —")}</option>` : `<option value="" disabled${cur ? "" : " selected"}>${L("— เลือกพื้นที่ —", "— choose an area —")}</option>`)
+    + knownAreas().map((a) => `<option value="${esc(a)}"${a === cur ? " selected" : ""}>${esc(a)}</option>`).join("")
+    + `<option value="__new">${L("+ เพิ่มพื้นที่ใหม่…", "+ Add a new area…")}</option>`;
+}
+async function openNewModal() {
   if (!canEdit) return;
-  if (server) { if (!okToLeave()) return; await createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] }); return; }
-  checkpoint();
-  doc = { version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] };
+  if (server) await loadServerList();
+  $("#newName").value = L("ผังเครือข่ายใหม่", "New network diagram");
+  $("#newArea").innerHTML = areaOptions(doc.area || "", false);
+  $("#newAreaText").hidden = true; $("#newAreaText").value = ""; $("#newAreaText").required = false;
+  openModal("#newModal"); $("#newName").focus(); $("#newName").select();
+}
+$("#newArea").addEventListener("change", (e) => {
+  const t = $("#newAreaText"), other = e.target.value === "__new";
+  t.hidden = !other; t.required = other; if (other) t.focus();
+});
+$("#newForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("#newName").value.trim() || L("ผังเครือข่ายใหม่", "New network diagram");
+  const area = ($("#newArea").value === "__new" ? $("#newAreaText").value : $("#newArea").value).trim();
+  if (!area) { toast(L("เลือกพื้นที่ก่อน", "Choose an area first")); return; }
+  await newDiagram(title, area);
+});
+const newBtn = $("#newBtn");
+newBtn.addEventListener("click", () => openNewModal());
+async function newDiagram(title, area) {
+  if (!canEdit) return;
+  if (server) { if (!okToLeave()) return; await createOnServer({ version: 1, title, area, nodes: [], links: [], zones: [] }); return; }
+  checkpoint(); closeModals();
+  doc = { version: 1, title, area, nodes: [], links: [], zones: [] };
   sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView();
   toast(L("เริ่มผังใหม่แล้ว กด ย้อน ถ้าต้องการผังเดิมคืน", "Started a new diagram. Press Undo to get the old one back."));
 }
@@ -2291,23 +2400,22 @@ async function openFiles() {
   box.innerHTML = `<p class="muted">${L("กำลังโหลด…", "Loading…")}</p>`;
   openModal("#filesModal");
   try {
-    const list = await (await apiFetch("diagrams")).json();
+    const list = await loadServerList();
+    const areaSel = $("#filesArea"), cur = areaSel.options.length ? areaSel.value : "__all";
+    areaSel.innerHTML = `<option value="__all">${L("ทุกพื้นที่", "All areas")}</option>` + knownAreas().map((a) => `<option value="${esc(a)}">${esc(a)}</option>`).join("") + (list.some((x) => !x.area) ? `<option value="">${NO_AREA()}</option>` : "");
+    areaSel.value = [...areaSel.options].some((o) => o.value === cur) ? cur : "__all";
     if (!list.length) { box.innerHTML = `<p class="muted">${L("ยังไม่มีผังบนเซิร์ฟเวอร์", "No diagrams on the server yet")}</p>`; return; }
-    box.innerHTML = list.map((x) => `<div class="list-row${x.id === docId ? " current" : ""}"><div><b>${esc(x.title)}</b><small>${L("อุปกรณ์", "Devices")} ${x.nodes} · ${L("แก้ไขล่าสุด", "Last edited")} ${esc(new Date(x.updatedAt).toLocaleString(L("th-TH", "en-GB")))}${x.updatedBy ? L(" โดย ", " by ") + esc(x.updatedBy) : ""}${x.id === docId ? L(" · กำลังเปิดอยู่", " · open now") : ""}</small></div><button class="btn" data-open="${esc(x.id)}">${L("เปิด", "Open")}</button>${canEdit ? `<button class="btn danger" data-del="${esc(x.id)}">${L("ลบ", "Delete")}</button>` : "<span></span>"}</div>`).join("");
+    const row = (x) => `<div class="list-row${x.id === docId ? " current" : ""}"><div><b>${esc(x.title)}</b><small>${L("อุปกรณ์", "Devices")} ${x.nodes} · ${L("แก้ไขล่าสุด", "Last edited")} ${esc(new Date(x.updatedAt).toLocaleString(L("th-TH", "en-GB")))}${x.updatedBy ? L(" โดย ", " by ") + esc(x.updatedBy) : ""}${x.id === docId ? L(" · กำลังเปิดอยู่", " · open now") : ""}</small></div><button class="btn" data-open="${esc(x.id)}">${L("เปิด", "Open")}</button>${canEdit ? `<button class="btn danger" data-del="${esc(x.id)}">${L("ลบ", "Delete")}</button>` : "<span></span>"}</div>`;
+    const groups = groupByArea(list).filter(([a]) => areaSel.value === "__all" || a === areaSel.value);
+    box.innerHTML = groups.map(([a, xs]) => `<div class="area-head">${esc(a || NO_AREA())} (${xs.length})</div>` + (xs.length ? xs.map(row).join("") : `<p class="muted" style="margin:0;font-size:12.5px">${L("ยังไม่มีผังในพื้นที่นี้", "No diagrams in this area yet")}</p>`)).join("");
   } catch (e) { box.innerHTML = `<p class="muted">${L("โหลดรายการไม่ได้ ตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่", "Couldn't load the list. Check that the server is running.")}</p>`; }
 }
 $("#filesBtn").onclick = openFiles;
-$("#filesNew").onclick = () => okToLeave() && createOnServer({ version: 1, title: L("ผังเครือข่ายใหม่", "New network diagram"), nodes: [], links: [], zones: [] });
+$("#filesArea").addEventListener("change", openFiles);
+$("#filesNew").onclick = () => openNewModal();
 $("#filesList").addEventListener("click", async (e) => {
   const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
-  if (o) {
-    try {
-      const r = await apiFetch("diagrams/" + encodeURIComponent(o.dataset.open));
-      const j = normalize(await r.json());
-      if (o.dataset.open !== docId && !okToLeave()) return;
-      doc = j; docId = o.dataset.open; undoStack = []; redoStack = []; sel = null; markSaved(); afterDocSwap(); fit(); closeModals();
-    } catch (err) { toast(L("เปิดผังไม่ได้", "Couldn't open the diagram")); }
-  }
+  if (o) await openDiagram(o.dataset.open);
   if (d) {
     if (!d.classList.contains("armed")) { d.classList.add("armed"); d.textContent = L("ยืนยันลบ", "Confirm delete"); return; }
     await apiFetch("diagrams/" + encodeURIComponent(d.dataset.del), { method: "DELETE" });
@@ -2680,6 +2788,7 @@ function auditChange(c) {
   if (c.op === "move") return c.kind === "zone" ? L(`ย้ายหรือปรับขนาด${what}`, `Moved or resized ${what}`) : L(`ย้ายตำแหน่ง${what}`, `Moved ${what}`);
   if (c.op === "path") return L(`ปรับแนวเส้น${what}`, `Re-routed ${what}`);
   const f = AUDIT_FIELDS[c.field] ? L(...AUDIT_FIELDS[c.field]) : EXTRA_LABELS[c.field] || c.field;
+  if (c.kind === "area") return `${L("พื้นที่", "Area")}: “${auditValue("", c.from) || "—"}” → “${auditValue("", c.to) || "—"}”`;
   if (c.kind === "title") return `${L("ชื่อผัง", "Diagram name")}: “${auditValue("", c.from)}” → “${auditValue("", c.to)}”`;
   return `${what} · ${f}: “${auditValue(c.field, c.from)}” → “${auditValue(c.field, c.to)}”`;
 }
@@ -2787,7 +2896,7 @@ function boot() {
       applyRole();
       if (vNote) toast(L(vNote.th, vNote.en));
     }
-    $("#filesBtn").hidden = false;
+    $("#filesBtn").hidden = false; updateAreaLabel();
     setPill(L("เชื่อมต่อเซิร์ฟเวอร์แล้ว", "Connected to server"), true);
     try {
       if (docId) {
