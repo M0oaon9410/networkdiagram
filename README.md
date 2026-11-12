@@ -1,6 +1,6 @@
 # NetPlan · โปรแกรมวาดผังเครือข่าย (Network Diagram)
 
-โปรแกรมบนเว็บสำหรับวาด network diagram มีอุปกรณ์ให้เลือก 16 ชนิด เช่น Router, Firewall, Core Switch, Switch, Access Point, Server, Database, NAS, PC, Laptop, Printer, IP Phone, กล้อง CCTV, UPS และใส่รายละเอียดของแต่ละอุปกรณ์ได้ (IP, Subnet, Gateway, VLAN, MAC, ยี่ห้อ, รุ่น, Serial, Hypervisor / Virtualization Platform (Nutanix / VMware / Proxmox), OS, สถานที่ติดตั้ง (เลือกจากรายการหรือพิมพ์เอง), สถานะ, หมายเหตุ และฟิลด์ที่เพิ่มเองได้) ผังจะถูกบันทึกเป็นไฟล์ JSON บนเซิร์ฟเวอร์เมื่อกดปุ่ม “บันทึก” (หรือ Ctrl+S) หรือติ๊ก “อัตโนมัติ” ให้บันทึกเองทุกครั้งที่แก้ไข
+โปรแกรมบนเว็บสำหรับวาด network diagram มีอุปกรณ์ให้เลือก 17 ชนิด เช่น Router, Firewall, Core Switch, Switch, Media Converter, Access Point, Server, Database, NAS, PC, Laptop, Printer, IP Phone, กล้อง CCTV, UPS และใส่รายละเอียดของแต่ละอุปกรณ์ได้ (IP, Subnet, Gateway, VLAN, MAC, Service port, ยี่ห้อ, รุ่น, Serial, Hypervisor / Virtualization Platform (Nutanix / VMware / Proxmox), OS, สถานที่ติดตั้ง (เลือกจากรายการหรือพิมพ์เอง), สถานะ, หมายเหตุ และฟิลด์ที่เพิ่มเองได้) ผังจะถูกบันทึกเป็นไฟล์ JSON บนเซิร์ฟเวอร์เมื่อกดปุ่ม “บันทึก” (หรือ Ctrl+S) หรือติ๊ก “อัตโนมัติ” ให้บันทึกเองทุกครั้งที่แก้ไข
 
 ## วิธีติดตั้งด้วย Docker
 

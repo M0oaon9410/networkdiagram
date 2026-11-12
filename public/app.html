@@ -484,6 +484,7 @@ const G = {
   loadbalancer: '<circle cx="5.5" cy="12" r="2.2"/><circle cx="18.5" cy="5.5" r="2.2"/><circle cx="18.5" cy="12" r="2.2"/><circle cx="18.5" cy="18.5" r="2.2"/><path d="M7.7 12h8.6M7.5 11 16.4 6.5M7.5 13l8.9 4.5"/>',
   coreswitch: '<rect x="3" y="9" width="18" height="10" rx="1.5"/><path d="M5 9V6h14v3"/><path d="M7 12.5h9l-1.8-1.6M17 15.5H8l1.8 1.6"/>',
   switch: '<rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 10.5h9l-1.8-1.6M17 13.5H8l1.8 1.6"/>',
+  mediaconverter: '<rect x="2.5" y="8" width="7" height="8" rx="1"/><rect x="14.5" y="8" width="7" height="8" rx="1"/><path d="M9.5 10.5h5l-1.6-1.5M14.5 13.5h-5l1.6 1.5"/><path d="M4.5 16v2.5M7.5 16v2.5M18 16v2.5"/>',
   ap: '<path d="M4 15h16v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8.8 10.4a4.6 4.6 0 0 1 6.4 0M6.3 7.8a8.2 8.2 0 0 1 11.4 0"/><circle cx="12" cy="12.6" r=".9" fill="currentColor"/>',
   server: '<rect x="5" y="3.5" width="14" height="5" rx="1"/><rect x="5" y="9.5" width="14" height="5" rx="1"/><rect x="5" y="15.5" width="14" height="5" rx="1"/><path d="M8 6h.01M8 12h.01M8 18h.01M12 6h4M12 12h4M12 18h4"/>',
   database: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
@@ -502,9 +503,10 @@ const TYPES = {
   loadbalancer: { label: "Load Balancer",    cat: "network",  extra: ["vip", "pool"] },
   coreswitch:   { label: "Core Switch (L3)", cat: "network",  extra: ["ports", "uplink", "stack"] },
   switch:       { label: "Switch",           cat: "network",  extra: ["ports", "poe", "uplink"] },
+  mediaconverter: { label: "Media Converter", cat: "network", extra: ["mcMedia", "speed", "wavelength"] },
   ap:           { label: "Access Point",     cat: "wireless", extra: ["ssid", "band", "channel", "controller"] },
   server:       { label: "Server",           cat: "compute",  extra: ["role", "cpu", "ram", "disk"] },
-  database:     { label: "Database",         cat: "compute",  extra: ["dbEngine", "svcPort", "disk"] },
+  database:     { label: "Database",         cat: "compute",  extra: ["dbEngine", "disk"] },
   storage:      { label: "NAS / Storage",    cat: "compute",  extra: ["capacity", "raid", "protocol"] },
   pc:           { label: "PC",               cat: "endpoint", extra: ["user", "dept"] },
   laptop:       { label: "Laptop",           cat: "endpoint", extra: ["user", "dept"] },
@@ -520,7 +522,7 @@ const EXTRA_LABELS = {
   band: "ย่านความถี่", channel: "Channel", controller: "Controller", role: "บทบาท / บริการ", cpu: "CPU", ram: "RAM",
   disk: "Storage", dbEngine: "Database engine", svcPort: "Service port", capacity: "ความจุ", raid: "RAID",
   protocol: "Protocol", user: "ผู้ใช้งาน", dept: "แผนก", ext: "เบอร์ภายใน", resolution: "ความละเอียด", nvr: "NVR",
-  va: "ขนาด (VA)", runtime: "Runtime",
+  va: "ขนาด (VA)", runtime: "Runtime", mcMedia: "ชนิดการแปลง", speed: "ความเร็ว", wavelength: "ความยาวคลื่น / ระยะ",
 };
 bilingual(CATS, {
   edge: ["WAN / ขอบเครือข่าย", "WAN / Edge"], security: ["ความปลอดภัย", "Security"], network: ["สวิตช์ / เครือข่าย", "Switching / Network"],
@@ -528,7 +530,7 @@ bilingual(CATS, {
 });
 bilingual(TYPES, {
   internet: ["อินเทอร์เน็ต / คลาวด์", "Internet / Cloud"], router: ["เราเตอร์", "Router"], firewall: ["ไฟร์วอลล์", "Firewall"],
-  loadbalancer: ["โหลดบาลานเซอร์", "Load Balancer"], coreswitch: ["คอร์สวิตช์ (L3)", "Core Switch (L3)"], switch: ["สวิตช์", "Switch"],
+  loadbalancer: ["โหลดบาลานเซอร์", "Load Balancer"], coreswitch: ["คอร์สวิตช์ (L3)", "Core Switch (L3)"], switch: ["สวิตช์", "Switch"], mediaconverter: ["มีเดียคอนเวอร์เตอร์", "Media Converter"],
   ap: ["แอคเซสพอยต์ (AP)", "Access Point"], server: ["เซิร์ฟเวอร์", "Server"], database: ["ฐานข้อมูล", "Database"],
   storage: ["NAS / สตอเรจ", "NAS / Storage"], pc: ["คอมพิวเตอร์ (PC)", "PC"], laptop: ["โน้ตบุ๊ก", "Laptop"],
   printer: ["เครื่องพิมพ์", "Printer"], phone: ["โทรศัพท์ IP", "IP Phone"], camera: ["กล้อง CCTV", "CCTV Camera"], ups: ["เครื่องสำรองไฟ (UPS)", "UPS"],
@@ -543,8 +545,9 @@ bilingual(EXTRA_LABELS, {
   dbEngine: ["ระบบฐานข้อมูล", "Database engine"], svcPort: ["พอร์ตบริการ", "Service port"], capacity: ["ความจุ", "Capacity"], raid: ["RAID", "RAID"],
   protocol: ["โปรโตคอล", "Protocol"], user: ["ผู้ใช้งาน", "User"], dept: ["แผนก", "Department"], ext: ["เบอร์ภายใน", "Extension"],
   resolution: ["ความละเอียด", "Resolution"], nvr: ["เครื่องบันทึก (NVR)", "NVR"], va: ["ขนาด (VA)", "Capacity (VA)"], runtime: ["เวลาสำรองไฟ", "Runtime"],
+  mcMedia: ["ชนิดการแปลง (เช่น Fiber SM ↔ RJ45)", "Conversion (e.g. Fiber SM ↔ RJ45)"], speed: ["ความเร็ว", "Speed"], wavelength: ["ความยาวคลื่น / ระยะ", "Wavelength / reach"],
 });
-const MONO_FIELDS = new Set(["ip", "mask", "gateway", "mac", "vlan", "serial", "wanIp", "vip", "circuit", "svcPort", "ports", "channel", "ext"]);
+const MONO_FIELDS = new Set(["ip", "mask", "gateway", "mac", "vlan", "serial", "wanIp", "vip", "circuit", "svcPort", "servicePort", "ports", "channel", "ext"]);
 const STATUS = {
   active: { label: "ใช้งานอยู่", color: "#2f9e5a" },
   planned: { label: "วางแผน / ยังไม่ติดตั้ง", color: "#3b7ddd" },
@@ -579,7 +582,7 @@ const ZONE_COLOR_LABELS = { blue: "น้ำเงิน", green: "เขีย�
 
 /* ---------- Sample ---------- */
 function sample() {
-  const n = (id, type, x, y, f = {}) => ({ id, type, x, y, name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [], ...f });
+  const n = (id, type, x, y, f = {}) => ({ id, type, x, y, name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [], ...f });
   const l = (from, to, kind, f = {}) => ({ id: "l_" + from + "_" + to, from, to, kind, label: "", fromPort: "", toPort: "", notes: "", ...f });
   return {
     version: 1,
@@ -591,7 +594,7 @@ function sample() {
       n("web1", "server", 740, 340, { name: "WEB-01", ip: "172.16.10.10", mask: "/24", gateway: "172.16.10.1", vendor: "Dell", model: "PowerEdge R650", os: "Ubuntu 24.04", location: "Rack A U20", extra: { role: "เว็บไซต์องค์กร (Nginx)", cpu: "2× Xeon Silver 4314", ram: "64 GB" } }),
       n("core", "coreswitch", 460, 490, { name: "CORE-SW-01", ip: "10.0.0.2", mask: "/24", vendor: "Aruba", model: "CX 6300M", location: "Rack A U36", extra: { ports: "48× 1G + 4× 25G", stack: "VSF 2 ตัว" } }),
       n("dc1", "server", 90, 650, { name: "DC-01", ip: "10.0.20.10", mask: "/24", gateway: "10.0.20.1", vlan: "20", os: "Windows Server 2022", extra: { role: "AD / DNS / DHCP" } }),
-      n("db1", "database", 200, 650, { name: "DB-01", ip: "10.0.20.20", mask: "/24", gateway: "10.0.20.1", vlan: "20", extra: { dbEngine: "PostgreSQL 16", svcPort: "5432" } }),
+      n("db1", "database", 200, 650, { name: "DB-01", ip: "10.0.20.20", mask: "/24", gateway: "10.0.20.1", vlan: "20", servicePort: "5432/tcp", extra: { dbEngine: "PostgreSQL 16" } }),
       n("nas1", "storage", 310, 650, { name: "NAS-01", ip: "10.0.20.30", mask: "/24", vlan: "20", vendor: "Synology", model: "RS1221+", extra: { capacity: "32 TB", raid: "RAID 6", protocol: "SMB / iSCSI" } }),
       n("sw1", "switch", 520, 680, { name: "SW-FL1", ip: "10.0.0.11", mask: "/24", vlan: "30", vendor: "Aruba", model: "CX 6100 24G PoE", location: "ตู้ Rack ชั้น 1", extra: { ports: "24", poe: "370 W", uplink: "10G SFP+ → CORE" } }),
       n("sw2", "switch", 790, 680, { name: "SW-FL2", ip: "10.0.0.12", mask: "/24", vlan: "40", vendor: "Aruba", model: "CX 6100 24G PoE", location: "ตู้ Rack ชั้น 2", extra: { ports: "24", poe: "370 W", uplink: "10G SFP+ → CORE" } }),
@@ -696,8 +699,8 @@ function normalize(d) {
   };
   for (const n of d.nodes) {
     if (!n || !n.id) continue;
-    out.nodes.push({ name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", os: "", location: "", status: "active", notes: "",
-      ...n, type: TYPES[n.type] ? n.type : "server", x: +n.x || 0, y: +n.y || 0, extra: { ...(n.extra || {}) }, custom: Array.isArray(n.custom) ? n.custom.map((c) => ({ k: String(c.k ?? ""), v: String(c.v ?? "") })) : [], id: safeId(n.id, "n") });
+    out.nodes.push({ name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", os: "", location: "", status: "active", notes: "",
+      ...n, servicePort: String(n.servicePort || (n.extra && n.extra.svcPort) || ""), type: TYPES[n.type] ? n.type : "server", x: +n.x || 0, y: +n.y || 0, extra: (({ svcPort, ...e }) => e)(n.extra || {}), custom: Array.isArray(n.custom) ? n.custom.map((c) => ({ k: String(c.k ?? ""), v: String(c.v ?? "") })) : [], id: safeId(n.id, "n") });
   }
   for (const z of d.zones || []) {
     if (!z) continue;
@@ -1456,7 +1459,7 @@ function setLang(l) {
 }
 for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLang(b.dataset.lang));
 function nextName(type) {
-  const base = { internet: "Internet", router: "RT", firewall: "FW", loadbalancer: "LB", coreswitch: "CORE-SW", switch: "SW", ap: "AP", server: "SRV", database: "DB", storage: "NAS", pc: "PC", laptop: "NB", printer: "PRN", phone: "PHONE", camera: "CAM", ups: "UPS" }[type];
+  const base = { internet: "Internet", router: "RT", firewall: "FW", loadbalancer: "LB", coreswitch: "CORE-SW", switch: "SW", mediaconverter: "MC", ap: "AP", server: "SRV", database: "DB", storage: "NAS", pc: "PC", laptop: "NB", printer: "PRN", phone: "PHONE", camera: "CAM", ups: "UPS" }[type];
   if (type === "internet") return base;
   let i = 1; const names = new Set(doc.nodes.map((n) => n.name));
   while (names.has(`${base}-${String(i).padStart(2, "0")}`)) i++;
@@ -1465,7 +1468,7 @@ function nextName(type) {
 function addNode(type, x, y) {
   if (!canEdit) return;
   checkpoint();
-  const n = { id: uid("n"), type, x, y, name: nextName(type), ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [] };
+  const n = { id: uid("n"), type, x, y, name: nextName(type), ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [] };
   doc.nodes.push(n);
   sel = { kind: "node", id: n.id };
   render(); renderInspector(); persist();
@@ -1563,6 +1566,7 @@ function renderInspector() {
     h += field(L("เกตเวย์", "Gateway"), "gateway", n.gateway, { ph: "10.0.0.1" });
     h += field("VLAN", "vlan", n.vlan, { ph: "10" });
     h += field(L("ที่อยู่ MAC", "MAC address"), "mac", n.mac, { full: true, ph: "00:1A:2B:3C:4D:5E" });
+    h += field("Service port", "servicePort", n.servicePort || "", { full: true, ph: "443/tcp, 8080, 161/udp" });
     h += `</div><div class="sec">${L("ฮาร์ดแวร์", "Hardware")}</div><div class="fields">`;
     h += field(L("ยี่ห้อ", "Vendor"), "vendor", n.vendor);
     h += field(L("รุ่น", "Model"), "model", n.model);
@@ -2323,7 +2327,7 @@ function exportPNG() {
   }));
 }
 function exportCSV() {
-  const cols = [["name", L("ชื่อ", "Name")], ["type", L("ชนิด", "Type")], ["status", L("สถานะ", "Status")], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["vendor", L("ยี่ห้อ", "Vendor")], ["model", L("รุ่น", "Model")], ["serial", "Serial"], ["platform", "Hypervisor / Virtualization Platform"], ["os", "OS/Firmware"], ["location", L("สถานที่ติดตั้ง", "Installation site")], ["extra", L("ข้อมูลเฉพาะ", "Type details")], ["custom", L("ฟิลด์เพิ่มเติม", "Custom fields")], ["links", L("เชื่อมต่อกับ", "Connected to")], ["notes", L("หมายเหตุ", "Notes")]];
+  const cols = [["name", L("ชื่อ", "Name")], ["type", L("ชนิด", "Type")], ["status", L("สถานะ", "Status")], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["servicePort", "Service port"], ["vendor", L("ยี่ห้อ", "Vendor")], ["model", L("รุ่น", "Model")], ["serial", "Serial"], ["platform", "Hypervisor / Virtualization Platform"], ["os", "OS/Firmware"], ["location", L("สถานที่ติดตั้ง", "Installation site")], ["extra", L("ข้อมูลเฉพาะ", "Type details")], ["custom", L("ฟิลด์เพิ่มเติม", "Custom fields")], ["links", L("เชื่อมต่อกับ", "Connected to")], ["notes", L("หมายเหตุ", "Notes")]];
   const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
   const rows = [cols.map((c) => q(c[1])).join(",")];
   for (const n of doc.nodes) {
@@ -2433,7 +2437,7 @@ const normText = (s) => String(s ?? "").normalize("NFC").toLocaleLowerCase("th")
 function searchFields(n) {
   const t = TYPES[n.type];
   const f = [["", n.name], [L("ชนิด", "Type"), t.label], ["IP", n.ip], ["Subnet", n.mask], ["Gateway", n.gateway], ["VLAN", n.vlan], ["MAC", n.mac],
-    [L("ยี่ห้อ", "Vendor"), n.vendor], [L("รุ่น", "Model"), n.model], ["Serial", n.serial], ["Hypervisor", n.platform], ["OS", n.os], [L("สถานที่ติดตั้ง", "Installation site"), n.location], [L("สถานะ", "Status"), STATUS[n.status]?.label], [L("หมายเหตุ", "Notes"), n.notes]];
+    ["Service port", n.servicePort], [L("ยี่ห้อ", "Vendor"), n.vendor], [L("รุ่น", "Model"), n.model], ["Serial", n.serial], ["Hypervisor", n.platform], ["OS", n.os], [L("สถานที่ติดตั้ง", "Installation site"), n.location], [L("สถานะ", "Status"), STATUS[n.status]?.label], [L("หมายเหตุ", "Notes"), n.notes]];
   for (const k of t.extra) f.push([EXTRA_LABELS[k] || k, n.extra[k]]);
   for (const c of n.custom) f.push([c.k || L("ฟิลด์", "Field"), c.v], [L("ฟิลด์", "Field"), c.k]);
   return f.filter(([, v]) => v);
@@ -2768,7 +2772,7 @@ const AUDIT_ACTIONS = {
 };
 const AUDIT_FIELDS = {
   name: ["ชื่อ", "name"], type: ["ชนิด", "type"], ip: ["IP", "IP"], mask: ["Subnet", "subnet"], gateway: ["Gateway", "gateway"], vlan: ["VLAN", "VLAN"],
-  mac: ["MAC", "MAC"], vendor: ["ยี่ห้อ", "vendor"], model: ["รุ่น", "model"], serial: ["Serial", "serial"], platform: ["Hypervisor / Virtualization Platform", "hypervisor / virtualization platform"], os: ["OS", "OS"], location: ["สถานที่ติดตั้ง", "installation site"],
+  mac: ["MAC", "MAC"], servicePort: ["Service port", "service port"], vendor: ["ยี่ห้อ", "vendor"], model: ["รุ่น", "model"], serial: ["Serial", "serial"], platform: ["Hypervisor / Virtualization Platform", "hypervisor / virtualization platform"], os: ["OS", "OS"], location: ["สถานที่ติดตั้ง", "installation site"],
   status: ["สถานะ", "status"], notes: ["หมายเหตุ", "notes"], color: ["สี", "color"], custom: ["ฟิลด์เพิ่มเติม", "custom fields"], kind: ["ชนิดสาย", "cable type"],
   label: ["ป้ายบนสาย", "label"], fromPort: ["พอร์ตต้นทาง", "port A"], toPort: ["พอร์ตปลายทาง", "port B"], route: ["รูปแบบเส้น", "line style"], ends: ["ปลายสาย", "ends"],
 };
