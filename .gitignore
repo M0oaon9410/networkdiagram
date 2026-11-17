@@ -9,6 +9,7 @@ npm-debug.log*
 # Environment / secrets
 .env
 .env.*
+certs/*
 
 # OS / editor
 .DS_Store
