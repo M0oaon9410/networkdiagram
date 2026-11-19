@@ -194,6 +194,9 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .nip { font: 500 11px var(--font-mono); fill: var(--muted); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
 .llabel { font: 500 11px var(--font-mono); fill: var(--fg); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
 .lport { font: 500 10px var(--font-mono); fill: var(--muted); paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; stroke-linejoin: round; }
+.lpill { fill: var(--canvas); fill-opacity: .92; stroke-opacity: .6; stroke-width: 1; }
+.ltext .lport { fill: var(--fg); stroke-width: 0; }
+.ltext .llabel { stroke-width: 0; }
 .zlabel { font: 700 13px var(--font-ui); }
 .ring { fill: none; stroke: var(--sel); stroke-width: 2.5; }
 .node { cursor: pointer; }
@@ -731,6 +734,12 @@ function normalize(d) {
     const nl = { label: "", fromPort: "", toPort: "", notes: "", ...l, from, to, id: safeId(l.id, "l"), kind: LINKS[l.kind] ? l.kind : "eth" };
     const bends = Array.isArray(l.bends) ? l.bends.filter((p) => p && isFinite(+p.x) && isFinite(+p.y)).map((p) => ({ x: +p.x, y: +p.y })) : [];
     if (bends.length) { nl.bends = bends; nl.firstH = !!l.firstH; } else { delete nl.bends; delete nl.firstH; }
+    const tp = {};
+    for (const k of ["a", "b", "m"]) {
+      const v = l.textPos && l.textPos[k];
+      if (v && isFinite(+v.x) && isFinite(+v.y) && (+v.x || +v.y)) tp[k] = { x: Math.round(+v.x), y: Math.round(+v.y) };
+    }
+    if (Object.keys(tp).length) nl.textPos = tp; else delete nl.textPos;
     out.links.push(nl);
   }
   return out;
@@ -900,7 +909,7 @@ const stable = (v) => JSON.stringify(v, (k, x) => (x && typeof x === "object" &&
 const same = (a, b) => a === b || stable(a) === stable(b);
 const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 // Where things sit is never worth a question: on a clash the local layout wins.
-const LAYOUT_KEYS = new Set(["x", "y", "w", "h", "bends", "firstH"]);
+const LAYOUT_KEYS = new Set(["x", "y", "w", "h", "bends", "firstH", "textPos"]);
 const onlyLayout = (a, b) => [...new Set([...Object.keys(a || {}), ...Object.keys(b || {})])].every((k) => LAYOUT_KEYS.has(k) || same(a?.[k], b?.[k]));
 
 function mergeFields(b, m, t, where, resolve, conflicts) {
@@ -1279,6 +1288,7 @@ function routeEnds(id, c, other, otherId) {
 /* Hand-adjusted elbow links keep their bend points in l.bends; l.firstH says whether the first
    segment is horizontal (segments alternate). The bends next to each end slide to stay level with it. */
 const routeCache = {};           // link id -> points last drawn, for dragging segments
+const textCache = {};            // "linkId:a|b|m" -> { at: default spot, c: where it was drawn }, for dragging port names and labels
 function manualRoute(l) {
   const bs = l.bends.map((p) => ({ x: p.x, y: p.y })), k = bs.length;
   if (!k) return null;
@@ -1513,6 +1523,65 @@ function elbowAnchor(id, c, other, horiz) {
   if (horiz) return { x: other.x > c.x ? z.x + z.w : z.x, y: clamp(other.y, z.y + 18, z.y + z.h - 18), zone: true };
   return { x: clamp(other.x, z.x + 18, z.x + z.w - 18), y: other.y > c.y ? z.y + z.h : z.y, zone: true };
 }
+// rough width of a line of text; Thai vowel and tone marks sit above or below and take no width
+function textW(s, fs, em = 0.62) {
+  let n = 0;
+  for (const ch of s) if (!/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/.test(ch)) n++;
+  return n * fs * em;
+}
+// Port names and link labels go on top in boxes of their own. One the user dragged stays where it was put;
+// the rest take the first of their spots that keeps clear of devices, their names and the text already placed.
+function placeTexts(texts, exp) {
+  const CELL = 64, grid = new Map();
+  const cells = (b, fn) => {
+    for (let gx = Math.floor(b.x / CELL); gx <= Math.floor((b.x + b.w) / CELL); gx++)
+      for (let gy = Math.floor(b.y / CELL); gy <= Math.floor((b.y + b.h) / CELL); gy++) fn(gx + "," + gy);
+  };
+  const add = (b) => cells(b, (k) => { let a = grid.get(k); if (!a) grid.set(k, (a = [])); a.push(b); });
+  const overlap = (r) => {
+    const seen = new Set();
+    let area = 0;
+    cells(r, (k) => {
+      for (const b of grid.get(k) || []) {
+        if (seen.has(b)) continue;
+        seen.add(b);
+        const ox = Math.min(r.x + r.w, b.x + b.w) - Math.max(r.x, b.x), oy = Math.min(r.y + r.h, b.y + b.h) - Math.max(r.y, b.y);
+        if (ox > 0 && oy > 0) area += ox * oy;
+      }
+    });
+    return area;
+  };
+  for (const n of doc.nodes) {
+    add({ x: n.x - 30, y: n.y - 30, w: 60, h: 60 });
+    const sub = n.ip || (n.vlan ? "VLAN " + n.vlan : ""), rows = 1 + (sub ? 1 : 0) + (roleOf(n) ? 1 : 0);
+    const w = Math.max(textW(n.name || TYPES[n.type].label, 12.5, 0.58), sub ? textW(sub, 11) : 0);
+    add({ x: n.x - w / 2, y: n.y + 32, w, h: 15 * rows });
+  }
+  const boxAt = (t, c) => ({ x: c.x - t.w / 2, y: c.y - t.h / 2, w: t.w, h: t.h });
+  for (const t of texts) { t.w = textW(t.text, t.fs) + 10; t.h = t.fs + 7; }
+  for (const t of texts) if (t.off) { t.c = { x: t.at.x + t.off.x, y: t.at.y + t.off.y }; add(boxAt(t, t.c)); }
+  // port names first: they have to stay near their device, a label in the middle can move further
+  const auto = texts.filter((t) => !t.off).sort((a, b) => (a.end === "m") - (b.end === "m"));
+  for (const t of auto) {
+    let best = t.spots[0], least = Infinity;
+    for (const c of t.spots) {
+      const a = overlap(boxAt(t, c));
+      if (a < least) { best = c; least = a; if (!a) break; }
+    }
+    t.c = best; add(boxAt(t, best));
+  }
+  let out = "";
+  for (const t of texts) {
+    if (!exp) textCache[t.id + ":" + t.end] = { at: t.at, c: t.c };
+    const { x, y } = t.c;
+    out += `<g class="ltext" data-kind="ltext" data-id="${t.id}" data-end="${t.end}"${t.lit ? "" : ' opacity=".15"'}${!exp && canEdit ? ' style="cursor:move"' : ""}>`;
+    // a name dragged well away from its line keeps a thin lead back to where it belongs
+    if (t.off && Math.hypot(t.c.x - t.at.x, t.c.y - t.at.y) > 30) out += `<line x1="${t.at.x}" y1="${t.at.y}" x2="${x}" y2="${y}" stroke="${t.col}" stroke-width="1" stroke-dasharray="3 3" stroke-opacity=".8"/>`;
+    out += `<rect class="lpill" x="${x - t.w / 2}" y="${y - t.h / 2}" width="${t.w}" height="${t.h}" rx="4" stroke="${t.col}"/>`;
+    out += `<text class="${t.cls}" x="${x}" y="${y + t.fs * 0.36}" text-anchor="middle">${esc(t.text)}</text></g>`;
+  }
+  return out;
+}
 function diagramMarkup(opts = {}) {
   const exp = !!opts.export;
   const hits = exp ? null : searchHits;
@@ -1538,7 +1607,7 @@ function diagramMarkup(opts = {}) {
     if (isSel && sel) out += `<rect data-kind="zone-resize" data-id="${z.id}" x="${z.x + z.w - 9}" y="${z.y + z.h - 9}" width="16" height="16" rx="3" fill="var(--panel)" stroke="${c}" stroke-width="2" style="cursor:nwse-resize"/>`;
   }
   // links
-  const pairs = {}, used = { h: new Map(), v: new Map() }, drawnSegs = [];
+  const pairs = {}, used = { h: new Map(), v: new Map() }, drawnSegs = [], texts = [];
   for (const l of doc.links) { const k = [l.from, l.to].sort().join("|"); (pairs[k] ||= []).push(l.id); }
   for (const l of doc.links) {
     const ca = endCenter(l.from), cb = endCenter(l.to);
@@ -1576,27 +1645,35 @@ function diagramMarkup(opts = {}) {
     if (bZone) out += `<circle cx="${PN.x}" cy="${PN.y}" r="4.5" fill="${col}"/>`;
     // keep text clear of the tile and of the name/IP printed below each node; a zone end only needs a small gap
     const clear = (dirY, zone) => zone ? 24 : 40 + (dirY > 0 ? 34 * dirY : 0);
-    // a point `dist` along the segment p→q, capped to `cap` of its length
-    const along = (p, q, zone, cap) => {
-      const L = Math.hypot(q.x - p.x, q.y - p.y) || 1, ux = (q.x - p.x) / L, uy = (q.y - p.y) / L;
-      const d = Math.min(L * cap, clear(uy, zone));
-      return { x: p.x + ux * d, y: p.y + uy * d, L };
-    };
     const cap = elbow ? 0.8 : 0.4;
-    const s1 = along(P0, pts[1], aZone, cap), s2 = along(PN, pts[pts.length - 2], bZone, cap);
-    let mid = { x: (s1.x + s2.x) / 2, y: (s1.y + s2.y) / 2 };
+    // Spots a port name may take, best first: `clear` along the segment p→q (capped to `cap` of its
+    // length), then further out or to either side of the line, for placeTexts to pick a free one.
+    const portSpots = (p, q, zone) => {
+      const L = Math.hypot(q.x - p.x, q.y - p.y) || 1, ux = (q.x - p.x) / L, uy = (q.y - p.y) / L;
+      const d0 = Math.min(L * cap, clear(uy, zone)), d1 = Math.max(d0, L * (elbow ? 0.8 : 0.45));
+      const list = [];
+      for (let d = d0; d <= d1 + 0.1 && list.length < 30; d += 14) for (const s of [0, 12, -12]) list.push({ x: p.x + ux * d - uy * s, y: p.y + uy * d + ux * s });
+      return { list, L };
+    };
+    const A = portSpots(P0, pts[1], aZone), B = portSpots(PN, pts[pts.length - 2], bZone);
+    let mid = { x: (A.list[0].x + B.list[0].x) / 2, y: (A.list[0].y + B.list[0].y) / 2 }, run = { x: PN.x - P0.x, y: PN.y - P0.y };
     if (elbow) {
       let best = -1;
       for (let i = 0; i < pts.length - 1; i++) {
         const L = Math.abs(pts[i + 1].x - pts[i].x) + Math.abs(pts[i + 1].y - pts[i].y);
-        if (L > best) { best = L; mid = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 }; }
+        if (L > best) { best = L; mid = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 }; run = { x: pts[i + 1].x - pts[i].x, y: pts[i + 1].y - pts[i].y }; }
       }
     }
-    if (l.label) out += `<text class="llabel" x="${mid.x}" y="${mid.y + 4}" text-anchor="middle">${esc(l.label)}</text>`;
-    const showPorts = elbow ? true : s1.L > 150;
+    const tp = l.textPos || {};
+    if (l.label) {
+      const rl = Math.hypot(run.x, run.y) || 1, ux = run.x / rl, uy = run.y / rl, spots = [];
+      for (const d of [0, 20, -20, 40, -40, 60, -60]) for (const s of [0, 14, -14]) spots.push({ x: mid.x + ux * d - uy * s, y: mid.y + uy * d + ux * s });
+      texts.push({ id: l.id, end: "m", cls: "llabel", fs: 11, text: l.label, at: mid, spots, off: tp.m, lit, col });
+    }
+    const showPorts = elbow ? true : A.L > 150;
     if (showPorts) {
-      if (l.fromPort && (!elbow || s1.L > 50)) out += `<text class="lport" x="${s1.x}" y="${s1.y + 3}" text-anchor="middle">${esc(l.fromPort)}</text>`;
-      if (l.toPort && (!elbow || s2.L > 50)) out += `<text class="lport" x="${s2.x}" y="${s2.y + 3}" text-anchor="middle">${esc(l.toPort)}</text>`;
+      if (l.fromPort && (!elbow || A.L > 50)) texts.push({ id: l.id, end: "a", cls: "lport", fs: 10, text: l.fromPort, at: A.list[0], spots: A.list, off: tp.a, lit, col });
+      if (l.toPort && (!elbow || B.L > 50)) texts.push({ id: l.id, end: "b", cls: "lport", fs: 10, text: l.toPort, at: B.list[0], spots: B.list, off: tp.b, lit, col });
     }
     out += `</g>`;
   }
@@ -1622,6 +1699,7 @@ function diagramMarkup(opts = {}) {
     if (role) out += `<text class="nrole" y="${sub ? 74 : 59}" text-anchor="middle">${esc(role)}</text>`;
     out += `</g>`;
   }
+  out += placeTexts(texts, exp);
   // grips on the selected right-angle link: drag one (or the line itself) to shift that run
   const sl = !exp && canEdit && sel && sel.kind === "link" && findLink(sel.id);
   if (sl && sl.route === "elbow" && routeCache[sl.id]) {
@@ -1921,7 +1999,10 @@ function renderInspector() {
     h += field(L("พอร์ตฝั่ง ", "Port on ") + (a.name || "A"), "fromPort", l.fromPort, { ph: "Gi1/0/1" });
     h += field(L("พอร์ตฝั่ง ", "Port on ") + (b.name || "B"), "toPort", l.toPort, { ph: "port1" });
     h += field("หมายเหตุ", "notes", l.notes, { type: "textarea", full: true });
-    h += `</div><div class="actions">${l.bends && l.route === "elbow" ? `<button class="btn" id="autoRouteBtn">${L("จัดแนวเส้นอัตโนมัติ", "Auto-route again")}</button>` : ""}<button class="btn" id="swapBtn">${L("สลับฝั่ง", "Swap ends")}</button><button class="btn danger" id="delBtn">${L("ลบสาย", "Delete link")}</button></div>`;
+    h += `<p class="muted f full" style="margin:0;font-size:12.5px;line-height:1.5">${l.textPos
+      ? L("ย้ายตำแหน่งข้อความบนสายเองอยู่ ลากต่อได้ หรือกดปุ่มด้านล่างเพื่อให้ระบบจัดให้", "Text on this link was placed by hand. Drag it again, or use the button below to place it automatically.")
+      : L("ลากชื่อพอร์ตหรือป้ายบนสายเพื่อย้ายไปวางตรงที่อ่านง่ายได้", "Drag a port name or the label to move it somewhere easier to read.")}</p>`;
+    h += `</div><div class="actions">${l.bends && l.route === "elbow" ? `<button class="btn" id="autoRouteBtn">${L("จัดแนวเส้นอัตโนมัติ", "Auto-route again")}</button>` : ""}${l.textPos ? `<button class="btn" id="autoTextBtn">${L("จัดข้อความอัตโนมัติ", "Auto-place text")}</button>` : ""}<button class="btn" id="swapBtn">${L("สลับฝั่ง", "Swap ends")}</button><button class="btn danger" id="delBtn">${L("ลบสาย", "Delete link")}</button></div>`;
   } else if (sel && sel.kind === "zone") {
     const z = findZone(sel.id);
     const inside = doc.nodes.filter((n) => n.x >= z.x && n.x <= z.x + z.w && n.y >= z.y && n.y <= z.y + z.h);
@@ -2081,7 +2162,9 @@ inspector.addEventListener("click", (e) => {
   if (b.dataset.customDel != null) { checkpoint(); findNode(sel.id).custom.splice(+b.dataset.customDel, 1); renderInspector(); persist(); return; }
   if (b.dataset.gotoLink) { sel = { kind: "link", id: b.dataset.gotoLink }; render(); renderInspector(); return; }
   if (b.id === "autoRouteBtn") { checkpoint(); const l = findLink(sel.id); delete l.bends; delete l.firstH; render(); renderInspector(); persist(); return; }
+  if (b.id === "autoTextBtn") { checkpoint(); delete findLink(sel.id).textPos; render(); renderInspector(); persist(); return; }
   if (b.id === "swapBtn") { checkpoint(); const l = findLink(sel.id); [l.from, l.to] = [l.to, l.from]; [l.fromPort, l.toPort] = [l.toPort, l.fromPort];
+    if (l.textPos) { const { a, b: e, ...rest } = l.textPos; l.textPos = { ...rest, ...(e ? { a: e } : {}), ...(a ? { b: a } : {}) }; }
     if (l.bends) { l.firstH = (l.bends.length % 2 === 0) === !!l.firstH; l.bends.reverse(); } render(); renderInspector(); persist(); return; }
   if (b.id === "connectFromBtn") { const id = sel.id; setMode("connect"); pendingFrom = id; render(); return; }
 });
@@ -2246,6 +2329,7 @@ svg.addEventListener("pointerdown", (e) => {
     // view only: clicking shows details, dragging pans
     multi = new Set();
     if (kind === "node" || kind === "zone" || kind === "link") sel = { kind, id };
+    else if (kind === "ltext") sel = { kind: "link", id };
     else if (kind !== "zone-resize") sel = null;
     renderInspector();
     drag = { type: "pan", sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
@@ -2275,6 +2359,11 @@ svg.addEventListener("pointerdown", (e) => {
     drag = { type: "link", from: id, cx: p.x, cy: p.y, sx: e.clientX, sy: e.clientY };
   } else if (mode === "zone" && kind !== "zone-resize") {
     drag = { type: "newzone", x0: snap(p.x), y0: snap(p.y), x1: snap(p.x), y1: snap(p.y) };
+  } else if (kind === "ltext" && mode === "select") {
+    const end = t.dataset.end, c = textCache[id + ":" + end];
+    multi = new Set();
+    if (!(sel && sel.kind === "link" && sel.id === id)) { sel = { kind: "link", id }; renderInspector(); }
+    drag = { type: "ltext", id, end, px: p.x, py: p.y, ox: c ? c.c.x - c.at.x : 0, oy: c ? c.c.y - c.at.y : 0, before: JSON.stringify(doc), moved: false };
   } else if (kind === "node") {
     const n = findNode(id);
     sel = { kind: "node", id }; renderInspector();
@@ -2322,6 +2411,13 @@ svg.addEventListener("pointermove", (e) => {
       l.bends = pts.slice(1, -1); l.firstH = isH(drag.base[0], drag.base[1]);
       drag.moved = true;
     }
+  } else if (drag.type === "ltext") {
+    const dx = p.x - drag.px, dy = p.y - drag.py;
+    if (drag.moved || Math.hypot(dx, dy) * view.k > 3) {
+      const l = findLink(drag.id);
+      l.textPos = { ...l.textPos, [drag.end]: { x: Math.round(drag.ox + dx), y: Math.round(drag.oy + dy) } };
+      drag.moved = true;
+    }
   } else if (drag.type === "link") { drag.cx = p.x; drag.cy = p.y; }
   else if (drag.type === "newzone") { drag.x1 = snap(p.x); drag.y1 = snap(p.y); }
   render();
@@ -2343,7 +2439,12 @@ function endDrag(e) {
     if (pts) storeBends(l, pts);
     renderInspector();
   }
-  if ((d.type === "node" || d.type === "zone" || d.type === "resize" || d.type === "group" || d.type === "seg") && d.moved) {
+  if (d.type === "ltext" && d.moved) {
+    const l = findLink(d.id), o = l.textPos[d.end];
+    if (!o.x && !o.y) { delete l.textPos[d.end]; if (!Object.keys(l.textPos).length) delete l.textPos; }
+    renderInspector();
+  }
+  if ((d.type === "node" || d.type === "zone" || d.type === "resize" || d.type === "group" || d.type === "seg" || d.type === "ltext") && d.moved) {
     undoStack.push(d.before); redoStack = []; updateUndoButtons(); persist();
   } else if (d.type === "link") {
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -2593,6 +2694,7 @@ const EXPORT_CSS = `.nlabel{font:600 12.5px 'NetPlan Sans','Noto Sans Thai',Taho
 .nip{font:500 11px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
 .llabel{font:500 11px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#18212d;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
 .lport{font:500 10px 'NetPlan Mono','NetPlan Sans',Consolas,monospace;fill:#5d6a7a;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
+.lpill{fill:#fff;fill-opacity:.92;stroke-opacity:.6;stroke-width:1}.ltext .lport{fill:#18212d;stroke-width:0}.ltext .llabel{stroke-width:0}
 .zlabel{font:700 13px 'NetPlan Sans','Noto Sans Thai',Tahoma,sans-serif}.statdot{stroke:#fff;stroke-width:2}
 .ttl{font:700 18px 'NetPlan Sans','Noto Sans Thai',Tahoma,sans-serif;fill:#18212d}.sub{font:400 12px 'NetPlan Sans',Tahoma,sans-serif;fill:#5d6a7a}`;
 // An exported SVG/PNG is drawn as a standalone image, which cannot load the page's fonts,
