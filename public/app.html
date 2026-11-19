@@ -1516,6 +1516,15 @@ function elbowAnchor(id, c, other, horiz) {
 function diagramMarkup(opts = {}) {
   const exp = !!opts.export;
   const hits = exp ? null : searchHits;
+  // Picking devices or zones lights up their links and whatever sits at the other end; the rest fades back.
+  // A search already fades things its own way, and a pick with no links leaves the diagram as is.
+  const picked = new Set([...selectedKeys()].map((k) => k.slice(2)));
+  let near = null;
+  if (!exp && !hits && picked.size) {
+    near = new Set(picked);
+    for (const l of doc.links) if (picked.has(l.from) || picked.has(l.to)) { near.add(l.from); near.add(l.to); }
+    if (near.size === picked.size) near = null;
+  }
   let out = "";
   // zones
   for (const z of doc.zones) {
@@ -1556,9 +1565,11 @@ function diagramMarkup(opts = {}) {
     const t = LINKS[l.kind] || LINKS.eth;
     const col = t.color || (exp ? "#6b7684" : "var(--link)");
     const isSel = !exp && sel && sel.kind === "link" && sel.id === l.id;
-    const lit = !hits || hits.has(l.id) || hits.has(l.from) || hits.has(l.to);
+    const tied = !!near && (picked.has(l.from) || picked.has(l.to));
+    const lit = near ? tied : !hits || hits.has(l.id) || hits.has(l.from) || hits.has(l.to);
     out += `<g data-kind="link" data-id="${l.id}"${lit ? "" : ' opacity=".15"'}>`;
     if (isSel) out += `<path d="${path}" fill="none" stroke="var(--sel)" stroke-opacity=".45" stroke-width="${t.width + 7}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    else if (tied) out += `<path d="${path}" fill="none" stroke="var(--accent)" stroke-opacity=".35" stroke-width="${t.width + 6}" stroke-linecap="round" stroke-linejoin="round"/>`;
     out += `<path d="${path}" fill="none" stroke="${col}" stroke-width="${t.width}" ${t.dash ? `stroke-dasharray="${t.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round"/>`;
     if (!exp) out += `<path class="hit" d="${roundedPath(pts, 12)}"/>`;
     if (aZone) out += `<circle cx="${P0.x}" cy="${P0.y}" r="4.5" fill="${col}"/>`;
@@ -1595,7 +1606,7 @@ function diagramMarkup(opts = {}) {
     const isSel = !exp && isPicked("node", n.id);
     const isPend = !exp && pendingFrom === n.id;
     const planned = n.status === "planned";
-    const op = hits && !hits.has(n.id) ? 0.18 : planned ? 0.7 : 1;
+    const op = hits && !hits.has(n.id) ? 0.18 : near && !near.has(n.id) ? 0.3 : planned ? 0.7 : 1;
     out += `<g class="node" data-kind="node" data-id="${n.id}" transform="translate(${n.x} ${n.y})"${op < 1 ? ` opacity="${op}"` : ""}>`;
     if (hits && hits.has(n.id) && !isSel) out += `<rect x="-33" y="-33" width="66" height="66" rx="14" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
     if (isSel || isPend) out += `<rect class="ring" x="-33" y="-33" width="66" height="66" rx="14"${isPend ? ' stroke-dasharray="5 4"' : ""}/>`;
