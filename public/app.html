@@ -198,6 +198,15 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .ring { fill: none; stroke: var(--sel); stroke-width: 2.5; }
 .node { cursor: pointer; }
 .hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
+.ptag { font: 700 11px var(--font-ui); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
+.peers { display: inline-flex; align-items: center; }
+.peers .avatar { width: 24px; height: 24px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; border: 2px solid var(--panel); margin-left: -6px; }
+.peers .avatar:first-child { margin-left: 0; }
+.peers .more { font-size: 12px; color: var(--muted); margin-left: 4px; }
+.peer-note { margin: 0 0 10px; font-size: 12.5px; }
+.merge-list { max-height: 50vh; overflow: auto; }
+.merge-row { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.merge-row .check { align-items: flex-start; overflow-wrap: anywhere; }
 .statdot { stroke: var(--canvas); stroke-width: 2; }
 
 @media (max-width: 900px) {
@@ -332,6 +341,7 @@ body.insp-hidden { --insp-w: 0px; }
     <div class="spacer"></div>
     <div class="grp seg" role="group" aria-label="ภาษา / Language" id="langSeg"><button class="btn" data-lang="th" lang="th">ไทย</button><button class="btn" data-lang="en" lang="en">EN</button></div>
     <details class="usermenu" id="userMenu" hidden><summary class="btn"><span class="avatar" id="userInitial"></span><span class="hide-sm" id="userName"></span></summary><div class="menu" id="userMenuBody"></div></details>
+    <span class="peers" id="peers" role="img" hidden></span>
     <span class="server-pill" id="serverPill" title=""><i></i><span>บันทึกในเบราว์เซอร์</span></span>
     <div class="grp">
       <button class="btn" id="filesBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>ผังทั้งหมด</button>
@@ -443,6 +453,10 @@ body.insp-hidden { --insp-w: 0px; }
 
 <div class="overlay" id="auditModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="auditTitle" style="width:min(980px,100%)" id="auditBody"></div>
+</div>
+
+<div class="overlay" id="mergeModal" data-sticky hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mergeTitle" style="width:min(720px,100%)" id="mergeBody"></div>
 </div>
 
 <div class="auth" id="authScreen" hidden><div class="auth-card" id="authCard"></div></div>
@@ -754,12 +768,36 @@ function updateUndoButtons() {
 /* ---------- Persistence ---------- */
 // On the server, changes wait for the Save button (Ctrl+S) unless "Auto" is ticked.
 // A copy is always kept in this browser, so a reload does not lose unsaved work.
-let saveTimer = null, savedJson = null, saving = false;
+// savedJson / savedRev are the server's version this browser last had; edits are measured against it,
+// and a save only goes through if the server is still at that revision (otherwise the two are merged).
+let saveTimer = null, savedJson = null, savedRev = 0, saving = false;
 let autoSave = false;
 try { autoSave = localStorage.getItem("netplan.autosave") === "1"; } catch (e) {}
 const serverMode = () => !!(server && docId && canEdit);
-function markSaved(json) { savedJson = json != null ? json : JSON.stringify(doc); updateSaveUI(); }
+function markSaved(json, rev) {
+  savedJson = json != null ? json : JSON.stringify(doc);
+  if (rev != null) savedRev = rev;
+  updateSaveUI(); connectLive();
+}
 function isDirty() { return serverMode() && savedJson != null && JSON.stringify(doc) !== savedJson; }
+// All tabs share one copy, so a tab with nothing unsaved leaves another tab's unsaved work in place.
+function stash() {
+  const dirty = isDirty();
+  try {
+    if (!dirty && serverMode()) {
+      const cur = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+      if (cur && cur.dirty && cur.tab && cur.tab !== tabId()) return;
+    }
+    localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId, dirty, base: dirty ? savedJson : null, rev: savedRev, tab: tabId() }));
+  } catch (e) {}
+}
+// survives a reload of this tab (sessionStorage), unlike clientId
+let tabIdCache = null;
+function tabId() {
+  if (tabIdCache) return tabIdCache;
+  try { tabIdCache = sessionStorage.getItem("netplan.tab"); if (!tabIdCache) sessionStorage.setItem("netplan.tab", (tabIdCache = clientId)); } catch (e) { tabIdCache = clientId; }
+  return tabIdCache;
+}
 function updateSaveUI() {
   const grp = $("#saveGrp"); if (!grp) return;
   grp.hidden = !serverMode();
@@ -774,28 +812,46 @@ function persist() {
   if (searchQ) runSearch();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId, dirty: isDirty() })); } catch (e) {}
+    stash();
     if (serverMode() && autoSave && isDirty()) saveNow(); else updateSaveUI();
   }, autoSave ? 600 : 150);
 }
-async function saveNow() {
-  if (!serverMode() || saving) return;
-  if (!isDirty()) { updateSaveUI(); return; }
+// Saves and incoming changes from other people take turns, so a merge never races a save.
+let syncChain = Promise.resolve(), saveQueued = false;
+const queueSync = (fn) => (syncChain = syncChain.then(fn).catch((e) => console.error(e)));
+function saveNow() {
+  if (!serverMode() || saveQueued) return;
+  saveQueued = true;
+  queueSync(() => { saveQueued = false; return doSave(); });
+}
+async function doSave() {
+  if (!serverMode()) return;
+  // e.g. a merge where every overlap was settled in the other person's favour leaves nothing to send
+  if (!isDirty()) { updateSaveUI(); setPill(L("บันทึกบนเซิร์ฟเวอร์แล้ว", "Saved to server"), true); return; }
   const json = JSON.stringify(doc), id = docId;
   saving = true; updateSaveUI(); setPill(L("กำลังบันทึก…", "Saving…"), true);
+  const failed = (msg) => { setPill(msg, false); toast(msg); };
+  let r;
   try {
-    const r = await apiFetch("diagrams/" + encodeURIComponent(id), { method: "PUT", body: doc });
-    saving = false;
-    if (r.ok && id === docId) { markSaved(json); try { localStorage.setItem(LS_KEY, JSON.stringify({ doc, docId, dirty: isDirty() })); } catch (e) {} }
-    else updateSaveUI();
-    if (!isDirty()) setPill(r.ok ? L("บันทึกบนเซิร์ฟเวอร์แล้ว", "Saved to server") : L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")", r.ok);
-    else if (!r.ok) { setPill(L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")", false); toast(L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")"); }
-    else if (autoSave) persist();
+    r = await apiFetch("diagrams/" + encodeURIComponent(id), { method: "PUT", body: doc, headers: { "X-NetPlan-Rev": String(savedRev), "X-NetPlan-Client": clientId } });
   } catch (e) {
     saving = false; updateSaveUI();
-    setPill(L("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server"), false);
-    toast(L("บันทึกไม่สำเร็จ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Save failed: can't reach the server"));
+    return failed(L("บันทึกไม่สำเร็จ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Save failed: can't reach the server"));
   }
+  saving = false;
+  if (id !== docId) { updateSaveUI(); return; }
+  const j = await r.json().catch(() => ({}));
+  if (r.ok) {
+    markSaved(json, j.rev); stash();
+    if (!isDirty()) setPill(L("บันทึกบนเซิร์ฟเวอร์แล้ว", "Saved to server"), true);
+    else if (autoSave) persist();
+    return;
+  }
+  updateSaveUI();
+  // someone else saved first: fold their version in, then save again
+  if (r.status === 409 && j.diagram) return rebase(j.diagram, j.rev, j.updatedBy, true);
+  if (r.status === 410) return lostDiagram(null);
+  failed(L("บันทึกไม่สำเร็จ", "Save failed") + " (" + r.status + ")");
 }
 // ask before throwing away unsaved changes (open another diagram, new diagram, sign out)
 function okToLeave() {
@@ -829,6 +885,248 @@ async function apiFetch(path, opts = {}) {
   const r = await fetch("api/" + path, o);
   if (r.status === 401 && authOn && !path.startsWith("auth/")) { me = null; showAuth("login", { th: "หมดเวลาการเข้าใช้งาน กรุณาเข้าสู่ระบบอีกครั้ง", en: "Your session ended. Please sign in again.", kind: "err" }); }
   return r;
+}
+
+/* ---------- Working together ----------
+   Several people can edit one diagram. A save that started from an older revision is refused by the
+   server; this browser then merges the two versions against the version both started from, item by
+   item and field by field, and only asks about a field both people set to different values.
+   A live stream says who else has the diagram open, what they have selected, and when they save,
+   so their changes are pulled in and merged right away. */
+const clientId = "c" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const revOf = (d) => (d && Number.isInteger(d.rev) && d.rev > 0 ? d.rev : 0);
+// equality that ignores the order keys were added in
+const stable = (v) => JSON.stringify(v, (k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, key) => ((o[key] = x[key]), o), {}) : x));
+const same = (a, b) => a === b || stable(a) === stable(b);
+const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+// Where things sit is never worth a question: on a clash the local layout wins.
+const LAYOUT_KEYS = new Set(["x", "y", "w", "h", "bends", "firstH"]);
+const onlyLayout = (a, b) => [...new Set([...Object.keys(a || {}), ...Object.keys(b || {})])].every((k) => LAYOUT_KEYS.has(k) || same(a?.[k], b?.[k]));
+
+function mergeFields(b, m, t, where, resolve, conflicts) {
+  const out = {};
+  for (const k of new Set([...Object.keys(t), ...Object.keys(m), ...Object.keys(b)])) {
+    const bv = b[k], mv = m[k], tv = t[k];
+    let v;
+    if (same(mv, tv) || same(tv, bv)) v = mv;
+    else if (same(mv, bv)) v = tv;
+    else if (k === "extra" && isObj(mv) && isObj(tv)) v = mergeFields(isObj(bv) ? bv : {}, mv, tv, { ...where, prefix: "extra." }, resolve, conflicts);
+    else if (LAYOUT_KEYS.has(k)) v = mv;
+    else {
+      const c = { key: `${where.kind}:${where.id}:${(where.prefix || "") + k}`, kind: where.kind, id: where.id, name: where.name, field: k, mine: mv, theirs: tv };
+      conflicts.push(c);
+      v = resolve(c) === "theirs" ? tv : mv;
+    }
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+function mergeList(kind, bl, ml, tl, resolve, conflicts, nameOf) {
+  const by = (list) => new Map(list.map((x) => [x.id, x]));
+  const bm = by(bl), mm = by(ml), tm = by(tl), out = [];
+  for (const id of [...tl.map((x) => x.id), ...ml.filter((x) => !tm.has(x.id)).map((x) => x.id)]) {
+    const bi = bm.get(id), mi = mm.get(id), ti = tm.get(id);
+    let v;
+    if (same(mi, ti) || same(ti, bi)) v = mi;
+    else if (same(mi, bi)) v = ti;
+    else if (mi && ti) v = mergeFields(bi || {}, mi, ti, { kind, id, name: nameOf(mi) }, resolve, conflicts);
+    else {
+      // one side removed it while the other changed it; a change that only moved it does not bring it back
+      const kept = mi || ti;
+      if (!onlyLayout(bi, kept)) {
+        const c = { key: `${kind}:${id}:*`, kind, id, name: nameOf(kept), field: null, mine: mi, theirs: ti };
+        conflicts.push(c);
+        v = resolve(c) === "theirs" ? ti : mi;
+      }
+    }
+    if (v) out.push(v);
+  }
+  return out;
+}
+// Three-way merge of whole diagrams. resolve(conflict) answers "mine" or "theirs".
+function mergeDocs(base, mine, theirs, resolve) {
+  const conflicts = [], names = new Map();
+  for (const d of [theirs, mine]) {
+    for (const n of d.nodes) names.set(n.id, n.name || TYPES[n.type]?.label || "?");
+    for (const z of d.zones) names.set(z.id, z.name || L("โซน", "Zone"));
+  }
+  const pick = (d) => ({ title: d.title, area: d.area });
+  const top = mergeFields(pick(base), pick(mine), pick(theirs), { kind: "doc", id: "", name: "" }, resolve, conflicts);
+  const merged = {
+    version: 1, title: top.title, area: top.area,
+    nodes: mergeList("node", base.nodes, mine.nodes, theirs.nodes, resolve, conflicts, (n) => names.get(n.id)),
+    zones: mergeList("zone", base.zones, mine.zones, theirs.zones, resolve, conflicts, (z) => names.get(z.id)),
+    links: mergeList("link", base.links, mine.links, theirs.links, resolve, conflicts, (l) => `${names.get(l.from) || "?"} ↔ ${names.get(l.to) || "?"}`),
+  };
+  return { doc: normalize(merged), conflicts };
+}
+
+// Incoming changes wait while something is being dragged or typed, so nothing jumps under the pointer or caret.
+let lastTypedAt = 0;
+document.addEventListener("input", () => (lastTypedAt = Date.now()), true);
+const busyEditing = () => !!drag || Date.now() - lastTypedAt < 1500;
+const whenIdle = () => new Promise((res) => { const tick = () => (busyEditing() ? setTimeout(tick, 300) : res()); tick(); });
+
+// Someone else saved revision `rev` (raw = their diagram). fromSave: our save was just refused because of it.
+let conflictNoted = 0;
+async function rebase(raw, rev, by, fromSave) {
+  await whenIdle();
+  if (!fromSave && rev <= savedRev) return;
+  const theirs = normalize(raw), theirsJson = JSON.stringify(theirs);
+  const base = savedJson ? JSON.parse(savedJson) : theirs;
+  const who = by || L("ผู้ใช้อื่น", "Someone else");
+  if (!savedJson || JSON.stringify(doc) === savedJson) {
+    applyRemote(base, theirs, theirsJson, theirs, rev);
+    setPill(L(`อัปเดตตามที่ ${who} แก้ไข`, `Updated with ${who}'s changes`), true);
+    return;
+  }
+  let res = mergeDocs(base, doc, theirs, () => "mine");
+  if (res.conflicts.length) {
+    if (!fromSave) {
+      if (conflictNoted !== rev) { conflictNoted = rev; toast(L(`${who} แก้ส่วนเดียวกับที่คุณแก้อยู่ ระบบจะให้เลือกตอนบันทึก`, `${who} changed some of the same things you're editing. You'll choose what to keep when you save.`)); }
+      return;
+    }
+    const choices = await askConflicts(res.conflicts, who);
+    if (!choices) { updateSaveUI(); setPill(L("ยังไม่บันทึก", "Not saved"), false); return; }
+    res = mergeDocs(base, doc, theirs, (c) => choices.get(c.key) || "mine");
+  }
+  applyRemote(base, theirs, theirsJson, res.doc, rev);
+  if (fromSave) return doSave();
+  setPill(L(`รวมการแก้ไขของ ${who} แล้ว`, `Merged ${who}'s changes`), true);
+}
+// Swap in the merged diagram. Undo steps are rebased too, so undoing never takes back someone else's change.
+function applyRemote(base, theirs, theirsJson, next, rev) {
+  const fixOne = (s) => JSON.stringify(mergeDocs(base, JSON.parse(s), theirs, () => "theirs").doc);
+  undoStack = undoStack.slice(-20).map(fixOne); redoStack = redoStack.slice(-20).map(fixOne);
+  // The step being recorded while a field has focus becomes an undo step on blur. Redrawing the panel
+  // replaces the field and refocusing it would start a fresh step, so the rebased one is put back.
+  const pendingEdit = editSnapshot ? fixOne(editSnapshot) : null;
+  const a = document.activeElement, focusId = a && a.id && a.matches("input,textarea") ? a.id : "";
+  const s0 = focusId ? a.selectionStart : null, s1 = focusId ? a.selectionEnd : null;
+  doc = next; markSaved(theirsJson, rev);
+  afterDocSwap();
+  const el = focusId && document.getElementById(focusId);
+  if (el) { if (el !== document.activeElement) el.focus(); try { el.setSelectionRange(s0, s1); } catch (e) {} }
+  if (pendingEdit && el === document.activeElement && undoStack[undoStack.length - 1] !== pendingEdit) editSnapshot = pendingEdit;
+}
+async function pullLatest(id, rev, by) {
+  if (id !== docId || !(rev > savedRev)) return;
+  let r;
+  try { r = await apiFetch("diagrams/" + encodeURIComponent(id)); } catch (e) { return; }
+  if (!r.ok || id !== docId) return;
+  const raw = await r.json();
+  if (revOf(raw) > savedRev) await rebase(raw, revOf(raw), by || raw.updatedBy, false);
+}
+function lostDiagram(by) {
+  docId = null; savedJson = null; connectLive(); updateSaveUI(); stash();
+  setPill(L("ผังนี้ถูกลบจากเซิร์ฟเวอร์แล้ว", "Deleted from the server"), false);
+  toast(by ? L(`${by} ลบผังนี้ออกจากเซิร์ฟเวอร์แล้ว งานบนจอยังอยู่ในเบราว์เซอร์นี้`, `${by} deleted this diagram from the server. What's on screen is still kept in this browser.`)
+    : L("ผังนี้ถูกลบออกจากเซิร์ฟเวอร์แล้ว งานบนจอยังอยู่ในเบราว์เซอร์นี้", "This diagram was deleted from the server. What's on screen is still kept in this browser."));
+}
+
+// Both people changed the same field: one question per field, defaulting to this person's version.
+function askConflicts(conflicts, who) {
+  return new Promise((resolve) => {
+    const show = (c, v) => {
+      if (c.field == null) return v ? L("เก็บไว้ (มีการแก้ไข)", "keep it (edited)") : L("ลบทิ้ง", "delete it");
+      if (c.field === "custom" && Array.isArray(v)) return v.map((x) => `${x.k}: ${x.v}`).join("; ") || L("(ว่าง)", "(empty)");
+      return auditValue(c.field, v == null ? "" : typeof v === "object" ? JSON.stringify(v) : v);
+    };
+    const fieldName = (c) => (c.field == null ? L("ทั้งชิ้น", "the whole item") : c.kind === "doc" ? (c.field === "title" ? L("ชื่อผัง", "Diagram name") : L("พื้นที่", "Area")) : AUDIT_FIELDS[c.field] ? L(...AUDIT_FIELDS[c.field]) : EXTRA_LABELS[c.field] || c.field);
+    const rows = conflicts.map((c, i) => `<div class="merge-row"><div><b>${esc(c.kind === "doc" ? L("ผังนี้", "This diagram") : `${auditKind(c.kind)} ${c.name || ""}`)}</b> · ${esc(fieldName(c))}</div>`
+      + `<label class="check"><input type="radio" name="mg${i}" value="mine" checked> ${L("ของคุณ", "Yours")}: “${esc(show(c, c.mine))}”</label>`
+      + `<label class="check"><input type="radio" name="mg${i}" value="theirs"> ${esc(who)}: “${esc(show(c, c.theirs))}”</label></div>`).join("");
+    const box = $("#mergeBody");
+    box.innerHTML = `<h2 id="mergeTitle">${L("มีการแก้ไขชนกัน", "Edits overlap")}</h2>`
+      + `<p class="muted" style="margin:0;line-height:1.6">${L(`${esc(who)} บันทึกผังนี้ระหว่างที่คุณแก้อยู่ ส่วนที่แก้คนละจุดรวมให้แล้ว เหลือ ${conflicts.length} ช่องที่แก้ตรงกัน เลือกว่าจะเก็บค่าของใคร`, `${esc(who)} saved this diagram while you were editing. Changes to different things are already combined; ${conflicts.length} field(s) were changed by both of you. Choose which value to keep.`)}</p>`
+      + `<div class="list merge-list">${rows}</div>`
+      + `<div class="actions" style="margin:0"><button class="btn primary" data-merge="apply">${L("บันทึกตามที่เลือก", "Save with these choices")}</button><button class="btn" data-merge="mine">${L("เลือกของคุณทั้งหมด", "All yours")}</button><button class="btn" data-merge="theirs">${L(`เลือกของ ${esc(who)} ทั้งหมด`, `All ${esc(who)}'s`)}</button><div class="spacer"></div><button class="btn" data-merge="cancel">${L("ยังไม่บันทึก", "Not now")}</button></div>`;
+    box.onclick = (e) => {
+      const b = e.target.closest("[data-merge]"); if (!b) return;
+      const act = b.dataset.merge;
+      if (act === "mine" || act === "theirs") { for (const r of box.querySelectorAll(`input[value="${act}"]`)) r.checked = true; return; }
+      $("#mergeModal").hidden = true;
+      if (act === "cancel") return resolve(null);
+      resolve(new Map(conflicts.map((c, i) => [c.key, box.querySelector(`input[name="mg${i}"]:checked`)?.value || "mine"])));
+    };
+    openModal("#mergeModal");
+  });
+}
+
+// ---- live stream and presence ----
+let live = null, liveFor = null, others = [], selSent = null, selTimer = 0;
+const PEER_COLORS = ["#d9480f", "#0b7285", "#5f3dc4", "#2b8a3e", "#c2255c", "#1864ab", "#e67700", "#495057"];
+const peerKey = (p) => p.user.id || p.client;
+function peerColor(p) { let h = 0; for (const ch of peerKey(p)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return PEER_COLORS[h % PEER_COLORS.length]; }
+const peerName = (p) => (me && p.user.id && p.user.id === me.id ? L("คุณ (อีกหน้าต่าง)", "You (another window)") : p.user.name || L("ผู้ใช้อื่น", "Someone else"));
+const selKey = () => (sel ? { node: "n", link: "l", zone: "z" }[sel.kind] + ":" + sel.id : "");
+function connectLive() {
+  const id = server && docId ? docId : null;
+  if (id === liveFor) return;
+  if (live) { live.close(); live = null; }
+  liveFor = id; others = []; selSent = null; updatePeers();
+  if (id && typeof EventSource !== "undefined") openLive(id);
+}
+function openLive(id) {
+  const es = new EventSource(`api/diagrams/${encodeURIComponent(id)}/events?client=${clientId}`);
+  live = es;
+  const data = (e) => { try { return JSON.parse(e.data); } catch (err) { return {}; } };
+  es.addEventListener("hello", (e) => { const j = data(e); selSent = null; sendSel(); queueSync(() => pullLatest(id, j.rev)); });
+  es.addEventListener("presence", (e) => { others = (data(e).people || []).filter((p) => p.client !== clientId && p.user); updatePeers(); render(); });
+  es.addEventListener("saved", (e) => { const j = data(e); if (j.client !== clientId) queueSync(() => pullLatest(id, j.rev, j.by && j.by.name)); });
+  es.addEventListener("deleted", (e) => { const j = data(e); if (j.client !== clientId && id === docId) lostDiagram(j.by && j.by.name); });
+  // the browser retries a dropped stream by itself, but gives up after an error reply (e.g. signed out)
+  es.onerror = () => {
+    if (es.readyState !== EventSource.CLOSED || live !== es) return;
+    live = null; others = []; updatePeers(); render();
+    setTimeout(() => { if (liveFor === id && !live && docId === id) openLive(id); }, 10000);
+  };
+}
+function sendSel() {
+  if (!live || !docId) return;
+  const k = selKey();
+  if (k === selSent) return;
+  selSent = k; clearTimeout(selTimer);
+  const id = docId;
+  selTimer = setTimeout(() => { if (id === docId) apiFetch(`diagrams/${encodeURIComponent(id)}/presence`, { method: "POST", body: { client: clientId, sel: k } }).catch(() => {}); }, 250);
+}
+function updatePeers() {
+  const box = $("#peers");
+  const list = [...new Map(others.map((p) => [peerKey(p), p])).values()];
+  box.hidden = !list.length;
+  box.title = L("เปิดผังนี้อยู่ด้วย: ", "Also here: ") + list.map(peerName).join(", ");
+  box.setAttribute("aria-label", box.title);
+  box.innerHTML = list.slice(0, 4).map((p) => `<span class="avatar" style="background:${peerColor(p)}">${esc(peerName(p).trim().charAt(0).toUpperCase())}</span>`).join("")
+    + (list.length > 4 ? `<span class="more">+${list.length - 4}</span>` : "");
+  updatePeerNote();
+}
+function updatePeerNote() {
+  const box = $("#peerNote"); if (!box) return;
+  const k = selKey(), here = k ? others.filter((p) => p.sel === k) : [];
+  box.innerHTML = here.length ? `<div class="note peer-note">${esc([...new Set(here.map(peerName))].join(", "))} ${L("กำลังเลือกชิ้นนี้อยู่ด้วย ถ้าแก้ช่องเดียวกัน ระบบจะให้เลือกตอนบันทึก", "also has this selected. If you both change the same field, you'll choose which to keep when saving.")}</div>` : "";
+}
+// rings around whatever the others have selected, in their color with their name
+function peerMarkup() {
+  let out = "";
+  const count = new Map();
+  for (const p of others) {
+    if (!p.sel) continue;
+    const id = p.sel.slice(2), i = count.get(p.sel) || 0, g = i * 5, col = peerColor(p), tag = i ? "" : esc(peerName(p));
+    count.set(p.sel, i + 1);
+    if (p.sel[0] === "n") {
+      const n = findNode(id); if (!n) continue;
+      out += `<g pointer-events="none" transform="translate(${n.x} ${n.y})"><rect x="${-37 - g}" y="${-37 - g}" width="${74 + 2 * g}" height="${74 + 2 * g}" rx="16" fill="none" stroke="${col}" stroke-width="2.5"/>${tag ? `<text class="ptag" x="-37" y="-43" fill="${col}">${tag}</text>` : ""}</g>`;
+    } else if (p.sel[0] === "z") {
+      const z = findZone(id); if (!z) continue;
+      out += `<g pointer-events="none"><rect x="${z.x - 4 - g}" y="${z.y - 4 - g}" width="${z.w + 8 + 2 * g}" height="${z.h + 8 + 2 * g}" rx="14" fill="none" stroke="${col}" stroke-width="2.5"/>${tag ? `<text class="ptag" x="${z.x}" y="${z.y - 9}" fill="${col}">${tag}</text>` : ""}</g>`;
+    } else {
+      const pts = routeCache[id]; if (!pts || !findLink(id)) continue;
+      const mi = Math.floor((pts.length - 1) / 2), a = pts[mi], b = pts[mi + 1];
+      out += `<path pointer-events="none" d="${roundedPath(pts, 12)}" fill="none" stroke="${col}" stroke-opacity=".45" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>`;
+      if (tag) out += `<text class="ptag" pointer-events="none" x="${(a.x + b.x) / 2}" y="${(a.y + b.y) / 2 - 12}" text-anchor="middle" fill="${col}">${tag}</text>`;
+    }
+  }
+  return out;
 }
 
 /* ---------- Geometry ---------- */
@@ -1325,6 +1623,7 @@ function diagramMarkup(opts = {}) {
       out += `<rect class="seggrip" data-kind="seg" data-id="${sl.id}" x="${mx - w / 2}" y="${my - ht / 2}" width="${w}" height="${ht}" rx="4" style="cursor:${h ? "ns-resize" : "ew-resize"}"/>`;
     }
   }
+  if (!exp && others.length) out += peerMarkup();
   return out;
 }
 let raf = 0;
@@ -1347,6 +1646,7 @@ function render() {
     world.innerHTML = diagramMarkup() + temp;
     updateScrollbars();
   });
+  sendSel();
 }
 function normRect(d) {
   return { x: Math.min(d.x0, d.x1), y: Math.min(d.y0, d.y1), w: Math.abs(d.x1 - d.x0), h: Math.abs(d.y1 - d.y0) };
@@ -1553,7 +1853,7 @@ function renderInspector() {
   multi = new Set([...multi].filter(keyExists));
   if (sel) multi.clear();
   if (multi.size === 1) setSelection(multi);
-  if (multi.size >= 2) { inspector.innerHTML = closeBtnHtml() + multiPanel(); lockInspector(); return; }
+  if (multi.size >= 2) { inspector.innerHTML = closeBtnHtml() + multiPanel(); lockInspector(); updatePeerNote(); return; }
   let h = "";
   if (sel && sel.kind === "node") {
     const n = findNode(sel.id), t = TYPES[n.type];
@@ -1659,7 +1959,7 @@ function renderInspector() {
     </ul>`;
   }
   inspector.innerHTML = closeBtnHtml() + h;
-  lockInspector();
+  lockInspector(); updatePeerNote();
 }
 const ICON_LEFT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 6-6 6 6 6M19 6l-6 6 6 6"/></svg>`;
 const ICON_RIGHT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 6 6 6-6 6M5 6l6 6-6 6"/></svg>`;
@@ -1673,7 +1973,7 @@ function panelTools(which, title) {
     + b("open", left ? ICON_RIGHT : ICON_LEFT, L("ขยายแถบ", "Expand panel"))
     + b("closed", ICON_X, L("ปิดแถบ", "Close panel") + " (" + reopen + ")") + `</div>`;
 }
-const closeBtnHtml = () => panelTools("insp");
+const closeBtnHtml = () => panelTools("insp") + '<div id="peerNote"></div>';
 function setPanel(which, state) {
   const body = document.body.classList;
   body.toggle(which + "-mini", state === "mini");
@@ -2220,9 +2520,9 @@ async function openDiagram(id) {
   try {
     const r = await apiFetch("diagrams/" + encodeURIComponent(id));
     if (!r.ok) throw new Error(r.status);
-    const j = normalize(await r.json());
+    const raw = await r.json(), j = normalize(raw);
     if (id !== docId && !okToLeave()) return;
-    doc = j; docId = id; undoStack = []; redoStack = []; sel = null; markSaved(); afterDocSwap(); fit(); closeModals();
+    doc = j; docId = id; undoStack = []; redoStack = []; sel = null; markSaved(null, revOf(raw)); afterDocSwap(); fit(); closeModals();
   } catch (err) { toast(L("เปิดผังไม่ได้", "Couldn't open the diagram")); }
 }
 // area picker used by the new-diagram form and the diagram panel: listed areas, or type a new one
@@ -2362,8 +2662,9 @@ $("#exportSel").addEventListener("change", async (e) => {
 
 /* ---------- JSON modal ---------- */
 function openModal(id) { $(id).hidden = false; }
-function closeModals() { for (const m of document.querySelectorAll(".overlay")) m.hidden = true; }
-for (const m of document.querySelectorAll(".overlay")) {
+// a data-sticky dialog waits for one of its own buttons
+function closeModals() { for (const m of document.querySelectorAll(".overlay:not([data-sticky])")) m.hidden = true; }
+for (const m of document.querySelectorAll(".overlay:not([data-sticky])")) {
   m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-close]")) m.hidden = true; });
 }
 $("#jsonBtn").onclick = () => { $("#jsonText").value = JSON.stringify(doc, null, 2); openModal("#jsonModal"); };
@@ -2399,7 +2700,7 @@ async function createOnServer(d, keepDoc) {
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
     if (!keepDoc) { checkpoint(); doc = normalize(d); sel = null; }
-    docId = j.id; markSaved(JSON.stringify(keepDoc ? d : doc));
+    docId = j.id; markSaved(JSON.stringify(keepDoc ? d : doc), j.rev || 1);
     if (!keepDoc) { afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView(); } else persist();
     closeModals();
     toast(L("สร้างผังบนเซิร์ฟเวอร์แล้ว", "Diagram created on the server"));
@@ -2429,7 +2730,7 @@ $("#filesList").addEventListener("click", async (e) => {
   if (d) {
     if (!d.classList.contains("armed")) { d.classList.add("armed"); d.textContent = L("ยืนยันลบ", "Confirm delete"); return; }
     await apiFetch("diagrams/" + encodeURIComponent(d.dataset.del), { method: "DELETE" });
-    if (d.dataset.del === docId) docId = null;
+    if (d.dataset.del === docId) { docId = null; savedJson = null; connectLive(); updateSaveUI(); }
     openFiles();
   }
 });
@@ -2912,19 +3213,24 @@ function boot() {
       if (docId) {
         const r = await apiFetch("diagrams/" + encodeURIComponent(docId));
         if (r.ok) {
-          const fromServer = normalize(await r.json());
-          markSaved(JSON.stringify(fromServer));
-          // unsaved edits left in this browser last time are kept, waiting for Save
+          const raw = await r.json(), fromServer = normalize(raw), rev = revOf(raw);
+          // unsaved edits left in this browser last time are kept, waiting for Save; they are measured
+          // against the version they were made on, so anything others saved since is merged in, not overwritten
+          let base = null;
+          try { base = saved && saved.base && saved.docId === docId ? JSON.stringify(normalize(JSON.parse(saved.base))) : null; } catch (e) {}
+          if (base) markSaved(base, +saved.rev || 0); else markSaved(JSON.stringify(fromServer), rev);
           if (saved && saved.dirty && saved.docId === docId && canEdit && JSON.stringify(doc) !== savedJson) {
             toast(L("กู้คืนการแก้ไขที่ยังไม่ได้บันทึกจากครั้งก่อนแล้ว กด บันทึก เพื่อเก็บขึ้นเซิร์ฟเวอร์", "Restored unsaved changes from last time. Press Save to keep them on the server."));
-          } else doc = fromServer;
+            if (rev > savedRev) queueSync(() => rebase(raw, rev, raw.updatedBy, false));
+          } else { doc = fromServer; markSaved(JSON.stringify(fromServer), rev); }
           afterDocSwap(); fit(); return;
         }
       }
       const list = await (await apiFetch("diagrams")).json();
       if (list.length) {
         const r = await apiFetch("diagrams/" + encodeURIComponent(list[0].id));
-        doc = normalize(await r.json()); docId = list[0].id; markSaved(); afterDocSwap(); fit();
+        const raw = await r.json();
+        doc = normalize(raw); docId = list[0].id; markSaved(null, revOf(raw)); afterDocSwap(); fit();
       } else {
         await createOnServer(doc, true);
       }

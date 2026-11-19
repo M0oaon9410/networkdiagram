@@ -8,6 +8,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { createAuth } = require("./lib/auth");
 const { createAudit } = require("./lib/audit");
+const { createLive, CLIENT_RE, SEL_RE } = require("./lib/live");
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "data"));
@@ -32,6 +33,7 @@ const SECURITY_HEADERS = {
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const audit = createAudit({ dataDir: DATA_DIR });
 const auth = AUTH_ON ? createAuth({ dataDir: DATA_DIR, audit }) : null;
+const live = createLive();
 
 // app.html holds the page content only; wrap it in a document skeleton once at startup.
 const APP_HTML =
@@ -68,14 +70,30 @@ function validDiagram(d) {
 }
 
 const fileFor = (id) => path.join(DATA_DIR, id + ".json");
+// Every write bumps `rev`; files from before revisions count as rev 0.
+const revOf = (d) => (d && Number.isInteger(d.rev) && d.rev > 0 ? d.rev : 0);
 
-async function writeDiagram(id, d, me) {
-  const rec = { ...d, updatedAt: new Date().toISOString(), updatedBy: me ? me.name : undefined };
+async function readDiagram(id) {
+  try { return JSON.parse(await fsp.readFile(fileFor(id), "utf8")); } catch (e) { return null; }
+}
+async function writeDiagram(id, d, me, rev) {
+  const rec = { ...d, rev, updatedAt: new Date().toISOString(), updatedBy: me ? me.name : undefined };
   const tmp = fileFor(id) + "." + process.pid + ".tmp";
   await fsp.writeFile(tmp, JSON.stringify(rec, null, 2));
   await fsp.rename(tmp, fileFor(id));
   return rec;
 }
+// Writes to one diagram run one at a time, so the revision check and the write cannot interleave.
+const writeQueues = new Map();
+function serialize(id, fn) {
+  const run = (writeQueues.get(id) || Promise.resolve()).then(fn);
+  const tail = run.catch(() => {});
+  writeQueues.set(id, tail);
+  tail.then(() => { if (writeQueues.get(id) === tail) writeQueues.delete(id); });
+  return run;
+}
+const liveUser = (me) => (me ? { id: me.id, name: me.name } : { id: "", name: "" });
+const clientOf = (req) => { const c = String(req.headers["x-netplan-client"] || ""); return CLIENT_RE.test(c) ? c : ""; };
 
 async function listDiagrams() {
   const files = (await fsp.readdir(DATA_DIR)).filter((f) => f.endsWith(".json"));
@@ -136,9 +154,11 @@ async function api(req, res, parts) {
       return send(res, 404, { error: "not found" });
     }
     if (!CAN_VIEW.includes(me.role)) return send(res, 403, { error: "pending" });
-    if (req.method !== "GET" && !CAN_EDIT.includes(me.role)) return send(res, 403, { error: "read_only" });
+    // viewers still share what they are looking at; every other write needs an editor
+    const presence = parts[1] === "diagrams" && parts[3] === "presence" && req.method === "POST";
+    if (req.method !== "GET" && !presence && !CAN_EDIT.includes(me.role)) return send(res, 403, { error: "read_only" });
   }
-  if (parts[1] !== "diagrams" || parts.length > 3) return send(res, 404, { error: "not found" });
+  if (parts[1] !== "diagrams" || parts.length > 4) return send(res, 404, { error: "not found" });
   const id = parts[2];
 
   if (!id) {
@@ -147,14 +167,15 @@ async function api(req, res, parts) {
       const d = JSON.parse(await readBody(req));
       if (!validDiagram(d)) return send(res, 400, { error: "invalid diagram" });
       const newId = crypto.randomBytes(6).toString("hex");
-      await writeDiagram(newId, d, me);
+      const rec = await writeDiagram(newId, d, me, 1);
       audit.diagramCreated(req, me, newId, d);
-      return send(res, 201, { id: newId });
+      return send(res, 201, { id: newId, rev: rec.rev });
     }
     return send(res, 405, { error: "method not allowed" });
   }
 
   if (!ID_RE.test(id)) return send(res, 400, { error: "invalid id" });
+  if (parts.length === 4) return diagramLive(req, res, id, parts[3], me);
   if (req.method === "GET") {
     try { return send(res, 200, await fsp.readFile(fileFor(id))); }
     catch (e) { return send(res, 404, { error: "not found" }); }
@@ -162,20 +183,54 @@ async function api(req, res, parts) {
   if (req.method === "PUT") {
     const d = JSON.parse(await readBody(req));
     if (!validDiagram(d)) return send(res, 400, { error: "invalid diagram" });
-    let before = null;
-    try { before = JSON.parse(await fsp.readFile(fileFor(id), "utf8")); } catch (e) {}
-    const rec = await writeDiagram(id, d, me);
-    if (before) audit.diagramSaved(req, me, id, before, d); else audit.diagramCreated(req, me, id, d);
-    return send(res, 200, { id, updatedAt: rec.updatedAt });
+    // X-NetPlan-Rev names the revision the edit started from; without it the save overwrites whatever is there
+    const revHeader = req.headers["x-netplan-rev"];
+    const base = revHeader === undefined ? null : /^\d{1,12}$/.test(String(revHeader)) ? +revHeader : NaN;
+    if (Number.isNaN(base)) return send(res, 400, { error: "invalid rev" });
+    return serialize(id, async () => {
+      const before = await readDiagram(id);
+      if (base !== null && base > 0 && !before) return send(res, 410, { error: "deleted" });
+      const cur = revOf(before);
+      if (base !== null && before && base !== cur) {
+        return send(res, 409, { error: "conflict", rev: cur, updatedAt: before.updatedAt || null, updatedBy: before.updatedBy || null, diagram: before });
+      }
+      const rec = await writeDiagram(id, d, me, cur + 1);
+      if (before) audit.diagramSaved(req, me, id, before, d); else audit.diagramCreated(req, me, id, d);
+      live.saved(id, rec.rev, liveUser(me), clientOf(req));
+      return send(res, 200, { id, rev: rec.rev, updatedAt: rec.updatedAt });
+    });
   }
   if (req.method === "DELETE") {
-    let before = null;
-    try { before = JSON.parse(await fsp.readFile(fileFor(id), "utf8")); } catch (e) {}
-    await fsp.rm(fileFor(id), { force: true });
-    if (before) audit.diagramDeleted(req, me, id, before);
-    return send(res, 204, "");
+    return serialize(id, async () => {
+      const before = await readDiagram(id);
+      await fsp.rm(fileFor(id), { force: true });
+      if (before) audit.diagramDeleted(req, me, id, before);
+      live.deleted(id, liveUser(me), clientOf(req));
+      return send(res, 204, "");
+    });
   }
   return send(res, 405, { error: "method not allowed" });
+}
+
+// GET /api/diagrams/:id/events?client=… is the live stream; POST …/presence { client, sel } shares a selection.
+async function diagramLive(req, res, id, what, me) {
+  if (what === "events" && req.method === "GET") {
+    const client = new URL(req.url, "http://x").searchParams.get("client") || "";
+    if (!CLIENT_RE.test(client)) return send(res, 400, { error: "invalid client" });
+    const d = await readDiagram(id);
+    if (!d) return send(res, 404, { error: "not found" });
+    // X-Accel-Buffering stops nginx from holding events back
+    res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no", ...SECURITY_HEADERS });
+    live.join(id, client, liveUser(me), res, revOf(d));
+    return;
+  }
+  if (what === "presence" && req.method === "POST") {
+    const b = JSON.parse((await readBody(req)) || "{}");
+    const client = String(b.client || ""), sel = String(b.sel || "");
+    if (!CLIENT_RE.test(client) || !SEL_RE.test(sel)) return send(res, 400, { error: "invalid presence" });
+    return live.select(id, client, liveUser(me).id, sel) ? send(res, 204, "") : send(res, 404, { error: "not connected" });
+  }
+  return send(res, 404, { error: "not found" });
 }
 
 const server = http.createServer(async (req, res) => {
@@ -206,4 +261,4 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => console.log(`NetPlan running on http://localhost:${PORT} (data: ${DATA_DIR}, login ${AUTH_ON ? "on" : "off"})`));
 // write any gathered diagram edits to the audit log before stopping
-for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { audit.flushAll().finally(() => server.close(() => process.exit(0))); setTimeout(() => process.exit(0), 3000).unref(); });
+for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { live.closeAll(); audit.flushAll().finally(() => server.close(() => process.exit(0))); setTimeout(() => process.exit(0), 3000).unref(); });
