@@ -1563,7 +1563,7 @@ function placeTexts(texts, exp) {
 }
 function diagramMarkup(opts = {}) {
   const exp = !!opts.export;
-  const hits = exp ? null : searchHits;
+  const hits = exp ? null : searchHits || siteHits();
   // Picking devices or zones lights up their links and whatever sits at the other end; the rest fades back.
   // A search already fades things its own way, and a pick with no links leaves the diagram as is.
   const picked = new Set([...selectedKeys()].map((k) => k.slice(2)));
@@ -1894,6 +1894,37 @@ function colorField(cur, custom, showReset = sel && sel.kind === "node") {
 }
 const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
+// Filter by installation site: a view setting for this tab only, dropped when another diagram is opened.
+// "" is every device, NO_SITE the ones with no site filled in.
+const NO_SITE = "__none";
+let siteFilter = "", siteFilterDoc = null;
+const siteOf = (n) => (n.location || "").trim();
+function activeSite() { return siteFilter && siteFilterDoc === docId ? siteFilter : ""; }
+function siteHits() {
+  const s = activeSite();
+  if (!s) return null;
+  return new Set(doc.nodes.filter((n) => (s === NO_SITE ? !siteOf(n) : siteOf(n) === s)).map((n) => n.id));
+}
+function siteFilterHtml() {
+  const counts = new Map();
+  let none = 0;
+  for (const n of doc.nodes) { const s = siteOf(n); if (s) counts.set(s, (counts.get(s) || 0) + 1); else none++; }
+  const cur = activeSite();
+  let h = `<div class="f full"><label for="f_sitefilter">${L("กรองตามสถานที่ติดตั้ง", "Filter by installation site")}</label><select id="f_sitefilter" data-sitefilter>`;
+  h += `<option value="">${L("— ทั้งหมด —", "— all —")} (${doc.nodes.length})</option>`;
+  for (const [s, c] of [...counts].sort((a, b) => a[0].localeCompare(b[0], "th"))) h += `<option value="${esc(s)}"${s === cur ? " selected" : ""}>${esc(s)} (${c})</option>`;
+  if (none) h += `<option value="${NO_SITE}"${cur === NO_SITE ? " selected" : ""}>${L("ยังไม่ระบุสถานที่", "No site filled in")} (${none})</option>`;
+  h += `</select></div>`;
+  if (!cur) return h;
+  const hits = siteHits(), list = doc.nodes.filter((n) => hits.has(n.id)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "th"));
+  h += `<div class="f full"><div class="list">`;
+  if (!list.length) h += `<p class="muted" style="margin:0;font-size:12.5px">${L("ไม่มีอุปกรณ์ที่สถานที่นี้", "No devices at this site")}</p>`;
+  for (const n of list) {
+    const sub = [TYPES[n.type].label, n.ip].filter(Boolean).join(" · ");
+    h += `<button class="btn" data-goto-node="${n.id}" style="justify-content:flex-start;width:100%;white-space:normal;text-align:left;gap:10px"><span class="dot" style="background:${nodeColor(n)};width:10px;height:10px;border-radius:3px;flex:none"></span><span style="min-width:0"><b>${esc(n.name || TYPES[n.type].label)}</b><br><small class="muted">${esc(sub)}</small></span></button>`;
+  }
+  return h + `</div></div>`;
+}
 function linkRow(l, selfId) {
   const mine = l.from === selfId;
   const myPort = mine ? l.fromPort : l.toPort, otherPort = mine ? l.toPort : l.fromPort;
@@ -1998,7 +2029,7 @@ function renderInspector() {
     const counts = {};
     for (const n of doc.nodes) counts[n.type] = (counts[n.type] || 0) + 1;
     h += `<div class="insp-head"><div><h2>${esc(doc.title)}</h2><small>${L("อุปกรณ์", "Devices")} ${doc.nodes.length} · ${L("สาย", "Links")} ${doc.links.length} · ${L("โซน", "Zones")} ${doc.zones.length}</small></div></div>`;
-    h += `<div class="fields"><div class="f full"><label for="f_docarea">${L("พื้นที่ของผังนี้", "Area of this diagram")}</label><select id="f_docarea" data-docarea>${areaOptions(doc.area || "", true)}</select><input id="f_docarea_new" data-docarea-new maxlength="80" placeholder="${L("พิมพ์ชื่อพื้นที่ใหม่", "Type the new area name")}" style="margin-top:6px" hidden></div></div>`;
+    h += `<div class="fields"><div class="f full"><label for="f_docarea">${L("พื้นที่ของผังนี้", "Area of this diagram")}</label><select id="f_docarea" data-docarea>${areaOptions(doc.area || "", true)}</select><input id="f_docarea_new" data-docarea-new maxlength="80" placeholder="${L("พิมพ์ชื่อพื้นที่ใหม่", "Type the new area name")}" style="margin-top:6px" hidden></div>${doc.nodes.length ? siteFilterHtml() : ""}</div>`;
     if (doc.nodes.length) {
       h += `<div class="sec">${L("อุปกรณ์ในผัง", "Devices in this diagram")}</div><div class="stats">`;
       for (const [k, t] of Object.entries(TYPES)) if (counts[k]) h += `<div class="t"><span class="dot" style="background:${CATS[t.cat].color}"></span>${esc(t.label)}</div><div class="n">${counts[k]}</div>`;
@@ -2053,13 +2084,19 @@ const setInspectorOpen = (open) => setPanel("insp", open ? "open" : "closed");
 function lockInspector() {
   if (canEdit) return;
   for (const el of inspector.querySelectorAll("input,select,textarea")) {
+    if (el.dataset.sitefilter != null) continue;
     if (el.tagName === "SELECT" || el.type === "color" || el.type === "checkbox") el.disabled = true; else el.readOnly = true;
   }
-  for (const b of inspector.querySelectorAll("button")) if (!b.dataset.pick && !b.dataset.gotoLink && !b.dataset.panel) b.hidden = true;
+  for (const b of inspector.querySelectorAll("button")) if (!b.dataset.pick && !b.dataset.gotoLink && !b.dataset.gotoNode && !b.dataset.panel) b.hidden = true;
 }
 
+inspector.addEventListener("change", (e) => {
+  if (e.target.dataset.sitefilter == null) return;
+  siteFilter = e.target.value; siteFilterDoc = docId;
+  render(); renderInspector();
+});
 let editSnapshot = null;
-inspector.addEventListener("focusin", (e) => { if (e.target.matches("input,select,textarea")) editSnapshot = JSON.stringify(doc); });
+inspector.addEventListener("focusin", (e) => { if (e.target.matches("input,select,textarea") && e.target.dataset.sitefilter == null) editSnapshot = JSON.stringify(doc); });
 inspector.addEventListener("focusout", () => {
   if (editSnapshot && editSnapshot !== JSON.stringify(doc)) { undoStack.push(editSnapshot); redoStack = []; updateUndoButtons(); }
   editSnapshot = null;
@@ -2118,6 +2155,7 @@ inspector.addEventListener("input", (e) => {
 inspector.addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.panel) return setPanel(b.dataset.panel, b.dataset.state);
+  if (b.dataset.gotoNode) { const n = findNode(b.dataset.gotoNode); if (n) { multi = new Set(); sel = { kind: "node", id: n.id }; centerOn(n); render(); renderInspector(); } return; }
   if (!canEdit && !b.dataset.pick && !b.dataset.gotoLink) return;
   if (b.id === "delBtn") return deleteSelected();
   if (b.dataset.pick) { setSelection([b.dataset.pick]); const o = keyExists(b.dataset.pick); centerOn(b.dataset.pick[0] === "n" ? o : { x: o.x + o.w / 2, y: o.y + o.h / 2 }); render(); renderInspector(); return; }
