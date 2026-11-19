@@ -242,7 +242,6 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .note.err { border-color: var(--danger); color: var(--danger); }
 .note.ok { border-color: #2f9e5a; }
 .usermenu { position: relative; }
-.area-head { margin: 10px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .usermenu summary { list-style: none; }
 .usermenu summary::-webkit-details-marker { display: none; }
 .usermenu .avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
@@ -407,7 +406,6 @@ body.insp-hidden { --insp-w: 0px; }
 <div class="overlay" id="filesModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="filesTitle">
     <h2 id="filesTitle">ผังที่บันทึกไว้บนเซิร์ฟเวอร์</h2>
-    <div class="f"><label for="filesArea">พื้นที่</label><select id="filesArea"></select></div>
     <div class="list" id="filesList"></div>
     <div class="actions" style="margin:0">
       <div class="spacer"></div>
@@ -1768,7 +1766,6 @@ const STATIC_TEXT = [
   ['#exportSel option[value="csv"]', "text", "รายการอุปกรณ์ CSV", "Device list (CSV)"], ['#exportSel option[value="json"]', "text", "ไฟล์ผัง JSON", "Diagram file (JSON)"],
   ["#saveBtn span", "text", "บันทึก", "Save"], ["#saveBtn", "title", "บันทึก (Ctrl+S)", "Save (Ctrl+S)"],
   ["label.autosave span", "text", "อัตโนมัติ", "Auto"], ["label.autosave", "title", "บันทึกขึ้นเซิร์ฟเวอร์ให้เองทุกครั้งที่แก้ไข", "Save to the server by itself after every change"],
-  ["label[for=filesArea]", "text", "พื้นที่", "Area"],
   ["#palette", "aria-label", "อุปกรณ์", "Devices"], ["#canvas", "aria-label", "พื้นที่วาดผังเครือข่าย", "Network diagram canvas"],
   ["#searchInput", "placeholder", "ค้นหาชื่อ, IP, VLAN, MAC, รุ่น…", "Search name, IP, VLAN, MAC, model…"],
   ["#searchInput", "aria-label", "ค้นหาอุปกรณ์ โซน หรือสาย", "Search devices, zones or links"],
@@ -2580,27 +2577,10 @@ $("#docTitle").addEventListener("focus", () => (editSnapshot = JSON.stringify(do
 $("#docTitle").addEventListener("input", (e) => { doc.title = e.target.value; persist(); if (!sel) renderInspector(); });
 $("#docTitle").addEventListener("blur", () => { if (editSnapshot && editSnapshot !== JSON.stringify(doc)) { undoStack.push(editSnapshot); redoStack = []; updateUndoButtons(); } editSnapshot = null; });
 
-/* ---------- Areas ----------
-   Each diagram belongs to an area (a site such as a palace or building). The header menu lists the
-   server's diagrams grouped by area; the area list is the defaults plus every area already in use. */
-const DEFAULT_AREAS = ["พระที่นั่งอัมพรสถาน", "พระบรมมหาราชวัง"];
 let serverList = [];
 async function loadServerList() {
   try { serverList = await (await apiFetch("diagrams")).json(); } catch (e) { serverList = []; }
   return serverList;
-}
-function knownAreas() {
-  const set = new Set(DEFAULT_AREAS);
-  for (const x of serverList) if (x.area) set.add(x.area);
-  if (doc.area) set.add(doc.area);
-  return [...set].sort((a, b) => a.localeCompare(b, "th"));
-}
-const NO_AREA = () => L("ไม่ระบุพื้นที่", "No area");
-function groupByArea(list) {
-  const groups = new Map();
-  for (const a of knownAreas()) groups.set(a, []);
-  for (const x of list) { const a = x.area || ""; if (!groups.has(a)) groups.set(a, []); groups.get(a).push(x); }
-  return [...groups].filter(([a, xs]) => xs.length || a);
 }
 async function openDiagram(id) {
   try {
@@ -2745,17 +2725,12 @@ async function openFiles() {
   openModal("#filesModal");
   try {
     const list = await loadServerList();
-    const areaSel = $("#filesArea"), cur = areaSel.options.length ? areaSel.value : "__all";
-    areaSel.innerHTML = `<option value="__all">${L("ทุกพื้นที่", "All areas")}</option>` + knownAreas().map((a) => `<option value="${esc(a)}">${esc(a)}</option>`).join("") + (list.some((x) => !x.area) ? `<option value="">${NO_AREA()}</option>` : "");
-    areaSel.value = [...areaSel.options].some((o) => o.value === cur) ? cur : "__all";
     if (!list.length) { box.innerHTML = `<p class="muted">${L("ยังไม่มีผังบนเซิร์ฟเวอร์", "No diagrams on the server yet")}</p>`; return; }
     const row = (x) => `<div class="list-row${x.id === docId ? " current" : ""}"><div><b>${esc(x.title)}</b><small>${L("อุปกรณ์", "Devices")} ${x.nodes} · ${L("แก้ไขล่าสุด", "Last edited")} ${esc(new Date(x.updatedAt).toLocaleString(L("th-TH", "en-GB")))}${x.updatedBy ? L(" โดย ", " by ") + esc(x.updatedBy) : ""}${x.id === docId ? L(" · กำลังเปิดอยู่", " · open now") : ""}</small></div><button class="btn" data-open="${esc(x.id)}">${L("เปิด", "Open")}</button>${canEdit ? `<button class="btn danger" data-del="${esc(x.id)}">${L("ลบ", "Delete")}</button>` : "<span></span>"}</div>`;
-    const groups = groupByArea(list).filter(([a]) => areaSel.value === "__all" || a === areaSel.value);
-    box.innerHTML = groups.map(([a, xs]) => `<div class="area-head">${esc(a || NO_AREA())} (${xs.length})</div>` + (xs.length ? xs.map(row).join("") : `<p class="muted" style="margin:0;font-size:12.5px">${L("ยังไม่มีผังในพื้นที่นี้", "No diagrams in this area yet")}</p>`)).join("");
+    box.innerHTML = list.map(row).join("");
   } catch (e) { box.innerHTML = `<p class="muted">${L("โหลดรายการไม่ได้ ตรวจสอบว่าเซิร์ฟเวอร์ทำงานอยู่", "Couldn't load the list. Check that the server is running.")}</p>`; }
 }
 $("#filesBtn").onclick = openFiles;
-$("#filesArea").addEventListener("change", openFiles);
 $("#filesList").addEventListener("click", async (e) => {
   const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
   if (o) await openDiagram(o.dataset.open);
