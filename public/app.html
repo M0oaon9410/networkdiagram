@@ -241,15 +241,7 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .note { border-radius: 8px; padding: 9px 11px; font-size: 13.5px; line-height: 1.55; border: 1px solid var(--line); background: var(--panel-2); }
 .note.err { border-color: var(--danger); color: var(--danger); }
 .note.ok { border-color: #2f9e5a; }
-.usermenu, .areamenu { position: relative; }
-.areamenu summary { list-style: none; max-width: 260px; }
-.areamenu summary::-webkit-details-marker { display: none; }
-.areamenu summary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.areamenu .menu { position: absolute; left: 0; top: calc(100% + 6px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; min-width: 280px; max-width: min(420px, 92vw); max-height: 70vh; overflow: auto; display: grid; gap: 2px; z-index: 40; box-shadow: 0 8px 24px rgb(0 0 0 / .14); }
-.areamenu .menu h4 { margin: 8px 8px 2px; font-size: 12px; color: var(--muted); font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
-.areamenu .menu h4:first-child { margin-top: 2px; }
-.areamenu .menu .btn { border: none; justify-content: flex-start; width: 100%; white-space: normal; text-align: left; }
-.areamenu .menu .btn.current { background: var(--panel-2); font-weight: 600; }
+.usermenu { position: relative; }
 .area-head { margin: 10px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .usermenu summary { list-style: none; }
 .usermenu summary::-webkit-details-marker { display: none; }
@@ -323,7 +315,6 @@ body.insp-hidden { --insp-w: 0px; }
       NetPlan
     </div>
     <input id="docTitle" class="title-input" aria-label="ชื่อผัง" maxlength="120">
-    <details class="areamenu" id="areaMenu" hidden><summary class="btn" title="เรียกดูผังตามพื้นที่"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg><span id="areaLabel">พื้นที่</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="m6 9 6 6 6-6"/></svg></summary><div class="menu" id="areaMenuBody"></div></details>
     <div class="sep hide-sm"></div>
     <div class="grp" role="group" aria-label="โหมด">
       <button class="btn edit-only" id="modeSelect" data-mode="select" title="เลือก / ย้าย (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg>เลือก/ย้าย</button>
@@ -745,7 +736,7 @@ function redo() {
 }
 function afterDocSwap() {
   if (sel && !(sel.kind === "node" ? findNode(sel.id) : sel.kind === "link" ? findLink(sel.id) : findZone(sel.id))) sel = null;
-  $("#docTitle").value = doc.title; updateAreaLabel();
+  $("#docTitle").value = doc.title;
   render(); renderInspector(); updateUndoButtons(); persist();
 }
 function updateUndoButtons() {
@@ -1777,7 +1768,7 @@ const STATIC_TEXT = [
   ['#exportSel option[value="csv"]', "text", "รายการอุปกรณ์ CSV", "Device list (CSV)"], ['#exportSel option[value="json"]', "text", "ไฟล์ผัง JSON", "Diagram file (JSON)"],
   ["#saveBtn span", "text", "บันทึก", "Save"], ["#saveBtn", "title", "บันทึก (Ctrl+S)", "Save (Ctrl+S)"],
   ["label.autosave span", "text", "อัตโนมัติ", "Auto"], ["label.autosave", "title", "บันทึกขึ้นเซิร์ฟเวอร์ให้เองทุกครั้งที่แก้ไข", "Save to the server by itself after every change"],
-  ["#areaMenu summary", "title", "เรียกดูผังตามพื้นที่", "Browse diagrams by area"], ["label[for=filesArea]", "text", "พื้นที่", "Area"],
+  ["label[for=filesArea]", "text", "พื้นที่", "Area"],
   ["#palette", "aria-label", "อุปกรณ์", "Devices"], ["#canvas", "aria-label", "พื้นที่วาดผังเครือข่าย", "Network diagram canvas"],
   ["#searchInput", "placeholder", "ค้นหาชื่อ, IP, VLAN, MAC, รุ่น…", "Search name, IP, VLAN, MAC, model…"],
   ["#searchInput", "aria-label", "ค้นหาอุปกรณ์ โซน หรือสาย", "Search devices, zones or links"],
@@ -2029,7 +2020,7 @@ function renderInspector() {
     const counts = {};
     for (const n of doc.nodes) counts[n.type] = (counts[n.type] || 0) + 1;
     h += `<div class="insp-head"><div><h2>${esc(doc.title)}</h2><small>${L("อุปกรณ์", "Devices")} ${doc.nodes.length} · ${L("สาย", "Links")} ${doc.links.length} · ${L("โซน", "Zones")} ${doc.zones.length}</small></div></div>`;
-    h += `<div class="fields"><div class="f full"><label for="f_docarea">${L("พื้นที่ของผังนี้", "Area of this diagram")}</label><select id="f_docarea" data-docarea>${areaOptions(doc.area || "", true)}</select><input id="f_docarea_new" data-docarea-new maxlength="80" placeholder="${L("พิมพ์ชื่อพื้นที่ใหม่", "Type the new area name")}" style="margin-top:6px" hidden></div>${doc.nodes.length ? siteFilterHtml() : ""}</div>`;
+    if (doc.nodes.length) h += `<div class="fields">${siteFilterHtml()}</div>`;
     if (doc.nodes.length) {
       h += `<div class="sec">${L("อุปกรณ์ในผัง", "Devices in this diagram")}</div><div class="stats">`;
       for (const [k, t] of Object.entries(TYPES)) if (counts[k]) h += `<div class="t"><span class="dot" style="background:${CATS[t.cat].color}"></span>${esc(t.label)}</div><div class="n">${counts[k]}</div>`;
@@ -2116,12 +2107,6 @@ inspector.addEventListener("input", (e) => {
       for (const k of multi) if (k[0] === "n") findNode(k.slice(2)).status = el.value;
     }
     render(); persist(); return;
-  }
-  if (el.dataset.docarea != null || el.dataset.docareaNew != null) {
-    const box = inspector.querySelector("#f_docarea_new");
-    if (el.dataset.docarea != null && el.value === "__new") { box.hidden = false; box.focus(); return; }
-    if (el.dataset.docarea != null) { box.hidden = true; box.value = ""; }
-    doc.area = el.value.trim().slice(0, 80); updateAreaLabel(); persist(); return;
   }
   const obj = sel && (sel.kind === "node" ? findNode(sel.id) : sel.kind === "link" ? findLink(sel.id) : findZone(sel.id));
   if (!obj) return;
@@ -2611,34 +2596,12 @@ function knownAreas() {
   return [...set].sort((a, b) => a.localeCompare(b, "th"));
 }
 const NO_AREA = () => L("ไม่ระบุพื้นที่", "No area");
-function updateAreaLabel() {
-  $("#areaLabel").textContent = doc.area || L("พื้นที่", "Area");
-  $("#areaMenu").hidden = !server;
-}
 function groupByArea(list) {
   const groups = new Map();
   for (const a of knownAreas()) groups.set(a, []);
   for (const x of list) { const a = x.area || ""; if (!groups.has(a)) groups.set(a, []); groups.get(a).push(x); }
   return [...groups].filter(([a, xs]) => xs.length || a);
 }
-async function renderAreaMenu() {
-  const box = $("#areaMenuBody");
-  box.innerHTML = `<p class="muted" style="margin:6px 8px">${L("กำลังโหลด…", "Loading…")}</p>`;
-  const list = await loadServerList();
-  let h = "";
-  for (const [a, xs] of groupByArea(list)) {
-    h += `<h4><span>${esc(a || NO_AREA())}</span><span>${xs.length}</span></h4>`;
-    h += xs.length ? xs.map((x) => `<button class="btn${x.id === docId ? " current" : ""}" type="button" data-open-diagram="${esc(x.id)}">${esc(x.title)}</button>`).join("")
-      : `<p class="muted" style="margin:0 8px 4px;font-size:12.5px">${L("ยังไม่มีผัง", "No diagrams yet")}</p>`;
-  }
-  box.innerHTML = h || `<p class="muted" style="margin:6px 8px">${L("ยังไม่มีผังบนเซิร์ฟเวอร์", "No diagrams on the server yet")}</p>`;
-}
-$("#areaMenu").addEventListener("toggle", () => { if ($("#areaMenu").open) renderAreaMenu(); });
-$("#areaMenuBody").addEventListener("click", (e) => {
-  const o = e.target.closest("[data-open-diagram]");
-  if (o) { $("#areaMenu").open = false; openDiagram(o.dataset.openDiagram); }
-});
-document.addEventListener("click", (e) => { const m = $("#areaMenu"); if (m.open && !m.contains(e.target)) m.open = false; });
 async function openDiagram(id) {
   try {
     const r = await apiFetch("diagrams/" + encodeURIComponent(id));
@@ -2647,12 +2610,6 @@ async function openDiagram(id) {
     if (id !== docId && !okToLeave()) return;
     doc = j; docId = id; undoStack = []; redoStack = []; sel = null; markSaved(null, revOf(raw)); afterDocSwap(); fit(); closeModals();
   } catch (err) { toast(L("เปิดผังไม่ได้", "Couldn't open the diagram")); }
-}
-// area picker used by the diagram panel: listed areas, or type a new one
-function areaOptions(cur, withNone) {
-  return (withNone ? `<option value="">${L("— ไม่ระบุ —", "— none —")}</option>` : `<option value="" disabled${cur ? "" : " selected"}>${L("— เลือกพื้นที่ —", "— choose an area —")}</option>`)
-    + knownAreas().map((a) => `<option value="${esc(a)}"${a === cur ? " selected" : ""}>${esc(a)}</option>`).join("")
-    + `<option value="__new">${L("+ เพิ่มพื้นที่ใหม่…", "+ Add a new area…")}</option>`;
 }
 /* ---------- Files: downloads ---------- */
 const dlPromise = (window.claude && typeof window.claude.use === "function") ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
@@ -3282,7 +3239,7 @@ function boot() {
       applyRole();
       if (vNote) toast(L(vNote.th, vNote.en));
     }
-    $("#filesBtn").hidden = false; updateAreaLabel();
+    $("#filesBtn").hidden = false;
     setPill(L("เชื่อมต่อเซิร์ฟเวอร์แล้ว", "Connected to server"), true);
     try {
       if (docId) {
