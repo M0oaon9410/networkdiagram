@@ -485,6 +485,7 @@ const G = {
   coreswitch: '<rect x="3" y="9" width="18" height="10" rx="1.5"/><path d="M5 9V6h14v3"/><path d="M7 12.5h9l-1.8-1.6M17 15.5H8l1.8 1.6"/>',
   switch: '<rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 10.5h9l-1.8-1.6M17 13.5H8l1.8 1.6"/>',
   mediaconverter: '<rect x="2.5" y="8" width="7" height="8" rx="1"/><rect x="14.5" y="8" width="7" height="8" rx="1"/><path d="M9.5 10.5h5l-1.6-1.5M14.5 13.5h-5l1.6 1.5"/><path d="M4.5 16v2.5M7.5 16v2.5M18 16v2.5"/>',
+  wlc: '<rect x="2.5" y="13" width="19" height="6.5" rx="1.2"/><path d="M6.2 16.2h.01M8.8 16.2h.01M14.2 16.2h4.2"/><path d="M9 10.1a4.3 4.3 0 0 1 6 0M6.5 7.4a7.8 7.8 0 0 1 11 0"/><circle cx="12" cy="11.8" r=".85" fill="currentColor"/>',
   ap: '<path d="M4 15h16v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8.8 10.4a4.6 4.6 0 0 1 6.4 0M6.3 7.8a8.2 8.2 0 0 1 11.4 0"/><circle cx="12" cy="12.6" r=".9" fill="currentColor"/>',
   server: '<rect x="5" y="3.5" width="14" height="5" rx="1"/><rect x="5" y="9.5" width="14" height="5" rx="1"/><rect x="5" y="15.5" width="14" height="5" rx="1"/><path d="M8 6h.01M8 12h.01M8 18h.01M12 6h4M12 12h4M12 18h4"/>',
   database: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
@@ -504,6 +505,7 @@ const TYPES = {
   coreswitch:   { label: "Core Switch (L3)", cat: "network",  extra: ["ports", "uplink", "stack"] },
   switch:       { label: "Switch",           cat: "network",  extra: ["ports", "poe", "uplink"] },
   mediaconverter: { label: "Media Converter", cat: "network", extra: ["mcMedia", "speed", "wavelength"] },
+  wlc:          { label: "Wireless Controller", cat: "wireless", extra: ["apCount", "wlans", "ha", "license"] },
   ap:           { label: "Access Point",     cat: "wireless", extra: ["ssid", "band", "channel", "controller"] },
   server:       { label: "Server",           cat: "compute",  extra: ["role", "cpu", "ram", "disk"] },
   database:     { label: "Database",         cat: "compute",  extra: ["dbEngine", "disk"] },
@@ -523,6 +525,7 @@ const EXTRA_LABELS = {
   disk: "Storage", dbEngine: "Database engine", svcPort: "Service port", capacity: "ความจุ", raid: "RAID",
   protocol: "Protocol", user: "ผู้ใช้งาน", dept: "แผนก", ext: "เบอร์ภายใน", resolution: "ความละเอียด", nvr: "NVR",
   va: "ขนาด (VA)", runtime: "Runtime", mcMedia: "ชนิดการแปลง", speed: "ความเร็ว", wavelength: "ความยาวคลื่น / ระยะ",
+  apCount: "จำนวน AP ที่ดูแล", wlans: "WLAN / SSID",
 };
 bilingual(CATS, {
   edge: ["WAN / ขอบเครือข่าย", "WAN / Edge"], security: ["ความปลอดภัย", "Security"], network: ["สวิตช์ / เครือข่าย", "Switching / Network"],
@@ -531,7 +534,7 @@ bilingual(CATS, {
 bilingual(TYPES, {
   internet: ["อินเทอร์เน็ต / คลาวด์", "Internet / Cloud"], router: ["เราเตอร์", "Router"], firewall: ["ไฟร์วอลล์", "Firewall"],
   loadbalancer: ["โหลดบาลานเซอร์", "Load Balancer"], coreswitch: ["คอร์สวิตช์ (L3)", "Core Switch (L3)"], switch: ["สวิตช์", "Switch"], mediaconverter: ["มีเดียคอนเวอร์เตอร์", "Media Converter"],
-  ap: ["แอคเซสพอยต์ (AP)", "Access Point"], server: ["เซิร์ฟเวอร์", "Server"], database: ["ฐานข้อมูล", "Database"],
+  wlc: ["ตัวควบคุมไร้สาย (WLC)", "Wireless Controller"], ap: ["แอคเซสพอยต์ (AP)", "Access Point"], server: ["เซิร์ฟเวอร์", "Server"], database: ["ฐานข้อมูล", "Database"],
   storage: ["NAS / สตอเรจ", "NAS / Storage"], pc: ["คอมพิวเตอร์ (PC)", "PC"], laptop: ["โน้ตบุ๊ก", "Laptop"],
   printer: ["เครื่องพิมพ์", "Printer"], phone: ["โทรศัพท์ IP", "IP Phone"], camera: ["กล้อง CCTV", "CCTV Camera"], ups: ["เครื่องสำรองไฟ (UPS)", "UPS"],
 });
@@ -546,6 +549,7 @@ bilingual(EXTRA_LABELS, {
   protocol: ["โปรโตคอล", "Protocol"], user: ["ผู้ใช้งาน", "User"], dept: ["แผนก", "Department"], ext: ["เบอร์ภายใน", "Extension"],
   resolution: ["ความละเอียด", "Resolution"], nvr: ["เครื่องบันทึก (NVR)", "NVR"], va: ["ขนาด (VA)", "Capacity (VA)"], runtime: ["เวลาสำรองไฟ", "Runtime"],
   mcMedia: ["ชนิดการแปลง (เช่น Fiber SM ↔ RJ45)", "Conversion (e.g. Fiber SM ↔ RJ45)"], speed: ["ความเร็ว", "Speed"], wavelength: ["ความยาวคลื่น / ระยะ", "Wavelength / reach"],
+  apCount: ["จำนวน AP ที่ดูแล", "Managed APs"], wlans: ["WLAN / SSID", "WLAN / SSID"],
 });
 const MONO_FIELDS = new Set(["ip", "mask", "gateway", "mac", "vlan", "serial", "wanIp", "vip", "circuit", "svcPort", "servicePort", "ports", "channel", "ext"]);
 const STATUS = {
@@ -1459,7 +1463,7 @@ function setLang(l) {
 }
 for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLang(b.dataset.lang));
 function nextName(type) {
-  const base = { internet: "Internet", router: "RT", firewall: "FW", loadbalancer: "LB", coreswitch: "CORE-SW", switch: "SW", mediaconverter: "MC", ap: "AP", server: "SRV", database: "DB", storage: "NAS", pc: "PC", laptop: "NB", printer: "PRN", phone: "PHONE", camera: "CAM", ups: "UPS" }[type];
+  const base = { internet: "Internet", router: "RT", firewall: "FW", loadbalancer: "LB", coreswitch: "CORE-SW", switch: "SW", mediaconverter: "MC", wlc: "WLC", ap: "AP", server: "SRV", database: "DB", storage: "NAS", pc: "PC", laptop: "NB", printer: "PRN", phone: "PHONE", camera: "CAM", ups: "UPS" }[type];
   if (type === "internet") return base;
   let i = 1; const names = new Set(doc.nodes.map((n) => n.name));
   while (names.has(`${base}-${String(i).padStart(2, "0")}`)) i++;
@@ -1484,7 +1488,7 @@ const OS_GROUPS = [
     "CentOS Stream 10", "CentOS Stream 9", "CentOS 7", "Oracle Linux 10", "Oracle Linux 9", "SUSE Linux Enterprise Server 16", "SUSE Linux Enterprise Server 15", "Fedora Server", "Alpine Linux", "Kali Linux"]],
   ["Virtualization", ["VMware ESXi 9", "VMware ESXi 8", "VMware ESXi 7", "Proxmox VE 9", "Proxmox VE 8", "Microsoft Hyper-V Server", "Citrix XenServer"]],
   ["Storage / NAS", ["TrueNAS", "Synology DSM", "QNAP QTS"]],
-  ["Network / Firewall", ["Cisco IOS", "Cisco IOS XE", "Cisco NX-OS", "Fortinet FortiOS", "Palo Alto PAN-OS", "Juniper Junos", "MikroTik RouterOS", "pfSense", "OPNsense", "Sophos Firewall OS", "Aruba AOS-CX", "Ubiquiti UniFi OS"]],
+  ["Network / Firewall", ["Cisco IOS", "Cisco IOS XE", "Cisco NX-OS", "Cisco AireOS", "Fortinet FortiOS", "Palo Alto PAN-OS", "Juniper Junos", "MikroTik RouterOS", "pfSense", "OPNsense", "Sophos Firewall OS", "ArubaOS", "Aruba AOS-CX", "Ruckus SmartZone", "Ubiquiti UniFi OS"]],
   ["Other", ["macOS", "FreeBSD", "Android", "iOS"]],
 ];
 const OS_LIST = new Set(OS_GROUPS.flatMap(([, list]) => list));
