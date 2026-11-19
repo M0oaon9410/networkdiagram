@@ -348,7 +348,7 @@ body.insp-hidden { --insp-w: 0px; }
     <span class="server-pill" id="serverPill" title=""><i></i><span>บันทึกในเบราว์เซอร์</span></span>
     <div class="grp">
       <button class="btn" id="filesBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>ผังทั้งหมด</button>
-      <button class="btn" id="jsonBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H7a2 2 0 0 0-2 2v4l-2 2 2 2v4a2 2 0 0 0 2 2h1M16 4h1a2 2 0 0 1 2 2v4l2 2-2 2v4a2 2 0 0 1-2 2h-1"/></svg>เปิด/บันทึก JSON</button>
+      <button class="btn" id="jsonBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H7a2 2 0 0 0-2 2v4l-2 2 2 2v4a2 2 0 0 0 2 2h1M16 4h1a2 2 0 0 1 2 2v4l2 2-2 2v4a2 2 0 0 1-2 2h-1"/></svg>บันทึก JSON</button>
       <select id="exportSel" class="sel-sm" aria-label="ส่งออก">
         <option value="">ส่งออก…</option>
         <option value="png">รูปภาพ PNG</option>
@@ -356,7 +356,6 @@ body.insp-hidden { --insp-w: 0px; }
         <option value="csv">รายการอุปกรณ์ CSV</option>
         <option value="json">ไฟล์ผัง JSON</option>
       </select>
-      <button class="btn danger edit-only" id="newBtn" title="เริ่มผังใหม่">ผังใหม่</button>
     </div>
   </header>
 
@@ -402,15 +401,12 @@ body.insp-hidden { --insp-w: 0px; }
 
 <div class="overlay" id="jsonModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="jsonTitle">
-    <h2 id="jsonTitle">เปิด / บันทึกผังเป็น JSON</h2>
-    <p class="muted" id="jsonHelp" style="margin:0">ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”</p>
-    <textarea id="jsonText" spellcheck="false" aria-label="ข้อมูล JSON"></textarea>
+    <h2 id="jsonTitle">บันทึกผังเป็น JSON</h2>
+    <p class="muted" id="jsonHelp" style="margin:0">ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกหรือบันทึกเป็นไฟล์เก็บไว้ได้</p>
+    <textarea id="jsonText" spellcheck="false" aria-label="ข้อมูล JSON" readonly></textarea>
     <div class="actions" style="margin:0">
-      <button class="btn primary edit-only" id="jsonLoad">โหลดจากข้อความนี้</button>
-      <button class="btn" id="jsonCopy">คัดลอก</button>
+      <button class="btn primary" id="jsonCopy">คัดลอก</button>
       <button class="btn" id="jsonSave">บันทึกเป็นไฟล์</button>
-      <label class="btn edit-only" for="jsonFile">เปิดไฟล์ .json…</label>
-      <input type="file" id="jsonFile" accept=".json,application/json" hidden>
       <div class="spacer"></div>
       <button class="btn" data-close>ปิด</button>
     </div>
@@ -423,27 +419,10 @@ body.insp-hidden { --insp-w: 0px; }
     <div class="f"><label for="filesArea">พื้นที่</label><select id="filesArea"></select></div>
     <div class="list" id="filesList"></div>
     <div class="actions" style="margin:0">
-      <button class="btn primary edit-only" id="filesNew">สร้างผังใหม่</button>
       <div class="spacer"></div>
       <button class="btn" data-close>ปิด</button>
     </div>
   </div>
-</div>
-
-<div class="overlay" id="newModal" hidden>
-  <form class="modal" role="dialog" aria-modal="true" aria-labelledby="newTitle" id="newForm" style="width:min(460px,100%)">
-    <h2 id="newTitle">สร้างผังใหม่</h2>
-    <div class="fields" style="grid-template-columns:1fr">
-      <div class="f"><label for="newName">ชื่อผัง</label><input id="newName" maxlength="120" required></div>
-      <div class="f"><label for="newArea">พื้นที่</label><select id="newArea" required></select>
-        <input id="newAreaText" maxlength="80" placeholder="พิมพ์ชื่อพื้นที่ใหม่" style="margin-top:6px" hidden></div>
-    </div>
-    <div class="actions" style="margin:0">
-      <button class="btn primary" type="submit" id="newCreate">สร้างผัง</button>
-      <div class="spacer"></div>
-      <button class="btn" type="button" data-close>ยกเลิก</button>
-    </div>
-  </form>
 </div>
 
 <div class="overlay" id="usersModal" hidden>
@@ -1792,16 +1771,13 @@ const STATIC_TEXT = [
   ["#modeZone", "text", "วาดโซน", "Draw zone"], ["#modeZone", "title", "วาดโซน / VLAN (Z)", "Draw a zone / VLAN (Z)"],
   ["#undoBtn .hide-sm", "text", "ย้อน", "Undo"], ["#undoBtn", "title", "ย้อนกลับ (Ctrl+Z)", "Undo (Ctrl+Z)"],
   ["#redoBtn .hide-sm", "text", "ทำซ้ำ", "Redo"], ["#redoBtn", "title", "ทำซ้ำ (Ctrl+Y)", "Redo (Ctrl+Y)"],
-  ["#filesBtn", "text", "ผังทั้งหมด", "All diagrams"], ["#jsonBtn", "text", "เปิด/บันทึก JSON", "Open / save JSON"],
+  ["#filesBtn", "text", "ผังทั้งหมด", "All diagrams"], ["#jsonBtn", "text", "บันทึก JSON", "Save JSON"],
   ["#exportSel", "aria-label", "ส่งออก", "Export"], ['#exportSel option[value=""]', "text", "ส่งออก…", "Export…"],
   ['#exportSel option[value="png"]', "text", "รูปภาพ PNG", "PNG image"], ['#exportSel option[value="svg"]', "text", "รูปภาพ SVG", "SVG image"],
   ['#exportSel option[value="csv"]', "text", "รายการอุปกรณ์ CSV", "Device list (CSV)"], ['#exportSel option[value="json"]', "text", "ไฟล์ผัง JSON", "Diagram file (JSON)"],
   ["#saveBtn span", "text", "บันทึก", "Save"], ["#saveBtn", "title", "บันทึก (Ctrl+S)", "Save (Ctrl+S)"],
   ["label.autosave span", "text", "อัตโนมัติ", "Auto"], ["label.autosave", "title", "บันทึกขึ้นเซิร์ฟเวอร์ให้เองทุกครั้งที่แก้ไข", "Save to the server by itself after every change"],
   ["#areaMenu summary", "title", "เรียกดูผังตามพื้นที่", "Browse diagrams by area"], ["label[for=filesArea]", "text", "พื้นที่", "Area"],
-  ["#newTitle", "text", "สร้างผังใหม่", "New diagram"], ["label[for=newName]", "text", "ชื่อผัง", "Diagram name"], ["label[for=newArea]", "text", "พื้นที่", "Area"],
-  ["#newAreaText", "placeholder", "พิมพ์ชื่อพื้นที่ใหม่", "Type the new area name"], ["#newCreate", "text", "สร้างผัง", "Create"], ["#newForm [data-close]", "text", "ยกเลิก", "Cancel"],
-  ["#newBtn", "text", "ผังใหม่", "New"], ["#newBtn", "title", "เริ่มผังใหม่", "Start a new diagram"],
   ["#palette", "aria-label", "อุปกรณ์", "Devices"], ["#canvas", "aria-label", "พื้นที่วาดผังเครือข่าย", "Network diagram canvas"],
   ["#searchInput", "placeholder", "ค้นหาชื่อ, IP, VLAN, MAC, รุ่น…", "Search name, IP, VLAN, MAC, model…"],
   ["#searchInput", "aria-label", "ค้นหาอุปกรณ์ โซน หรือสาย", "Search devices, zones or links"],
@@ -1813,13 +1789,12 @@ const STATIC_TEXT = [
   ["#fullBtn span", "text", "เต็มจอ", "Full screen"], ["#fullBtn", "title", "ดูแบบเต็มจอ (F)", "Full screen (F)"],
   ["#palOpen", "text", "อุปกรณ์", "Devices"], ["#palOpen", "title", "เปิดแถบอุปกรณ์", "Open the device panel"],
   ["#inspOpen", "text", "แผงรายละเอียด", "Details panel"], ["#inspOpen", "title", "เปิดแผงรายละเอียด", "Open the details panel"],
-  ["#jsonTitle", "text", "เปิด / บันทึกผังเป็น JSON", "Open / save the diagram as JSON"],
-  ["#jsonHelp", "text", "ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกเก็บไว้ หรือวาง JSON ที่เคยบันทึกไว้แล้วกด “โหลดจากข้อความนี้”", "Below is the current diagram as JSON. Copy it to keep a copy, or paste saved JSON and press “Load this text”."],
+  ["#jsonTitle", "text", "บันทึกผังเป็น JSON", "Save the diagram as JSON"],
+  ["#jsonHelp", "text", "ข้อความด้านล่างคือข้อมูลผังปัจจุบัน คัดลอกหรือบันทึกเป็นไฟล์เก็บไว้ได้", "Below is the current diagram as JSON. Copy it or save it as a file to keep a copy."],
   ["#jsonText", "aria-label", "ข้อมูล JSON", "JSON data"],
-  ["#jsonLoad", "text", "โหลดจากข้อความนี้", "Load this text"], ["#jsonCopy", "text", "คัดลอก", "Copy"],
-  ["#jsonSave", "text", "บันทึกเป็นไฟล์", "Save as file"], ['label[for="jsonFile"]', "text", "เปิดไฟล์ .json…", "Open .json file…"],
-  ["#filesTitle", "text", "ผังที่บันทึกไว้บนเซิร์ฟเวอร์", "Diagrams saved on the server"], ["#filesNew", "text", "สร้างผังใหม่", "New diagram"],
-  ["[data-close]", "text", "ปิด", "Close"],
+  ["#jsonCopy", "text", "คัดลอก", "Copy"],
+  ["#jsonSave", "text", "บันทึกเป็นไฟล์", "Save as file"],
+  ["#filesTitle", "text", "ผังที่บันทึกไว้บนเซิร์ฟเวอร์", "Diagrams saved on the server"],  ["[data-close]", "text", "ปิด", "Close"],
 ];
 function setOwnText(el, txt) {
   for (let i = el.childNodes.length - 1; i >= 0; i--) {
@@ -2618,14 +2593,12 @@ async function renderAreaMenu() {
     h += xs.length ? xs.map((x) => `<button class="btn${x.id === docId ? " current" : ""}" type="button" data-open-diagram="${esc(x.id)}">${esc(x.title)}</button>`).join("")
       : `<p class="muted" style="margin:0 8px 4px;font-size:12.5px">${L("ยังไม่มีผัง", "No diagrams yet")}</p>`;
   }
-  if (canEdit) h += `<button class="btn" type="button" data-new-diagram style="border-top:1px solid var(--line);border-radius:0;margin-top:4px">+ ${L("สร้างผังใหม่", "New diagram")}</button>`;
   box.innerHTML = h || `<p class="muted" style="margin:6px 8px">${L("ยังไม่มีผังบนเซิร์ฟเวอร์", "No diagrams on the server yet")}</p>`;
 }
 $("#areaMenu").addEventListener("toggle", () => { if ($("#areaMenu").open) renderAreaMenu(); });
 $("#areaMenuBody").addEventListener("click", (e) => {
-  const o = e.target.closest("[data-open-diagram]"), n = e.target.closest("[data-new-diagram]");
+  const o = e.target.closest("[data-open-diagram]");
   if (o) { $("#areaMenu").open = false; openDiagram(o.dataset.openDiagram); }
-  if (n) { $("#areaMenu").open = false; openNewModal(); }
 });
 document.addEventListener("click", (e) => { const m = $("#areaMenu"); if (m.open && !m.contains(e.target)) m.open = false; });
 async function openDiagram(id) {
@@ -2637,42 +2610,12 @@ async function openDiagram(id) {
     doc = j; docId = id; undoStack = []; redoStack = []; sel = null; markSaved(null, revOf(raw)); afterDocSwap(); fit(); closeModals();
   } catch (err) { toast(L("เปิดผังไม่ได้", "Couldn't open the diagram")); }
 }
-// area picker used by the new-diagram form and the diagram panel: listed areas, or type a new one
+// area picker used by the diagram panel: listed areas, or type a new one
 function areaOptions(cur, withNone) {
   return (withNone ? `<option value="">${L("— ไม่ระบุ —", "— none —")}</option>` : `<option value="" disabled${cur ? "" : " selected"}>${L("— เลือกพื้นที่ —", "— choose an area —")}</option>`)
     + knownAreas().map((a) => `<option value="${esc(a)}"${a === cur ? " selected" : ""}>${esc(a)}</option>`).join("")
     + `<option value="__new">${L("+ เพิ่มพื้นที่ใหม่…", "+ Add a new area…")}</option>`;
 }
-async function openNewModal() {
-  if (!canEdit) return;
-  if (server) await loadServerList();
-  $("#newName").value = L("ผังเครือข่ายใหม่", "New network diagram");
-  $("#newArea").innerHTML = areaOptions(doc.area || "", false);
-  $("#newAreaText").hidden = true; $("#newAreaText").value = ""; $("#newAreaText").required = false;
-  openModal("#newModal"); $("#newName").focus(); $("#newName").select();
-}
-$("#newArea").addEventListener("change", (e) => {
-  const t = $("#newAreaText"), other = e.target.value === "__new";
-  t.hidden = !other; t.required = other; if (other) t.focus();
-});
-$("#newForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const title = $("#newName").value.trim() || L("ผังเครือข่ายใหม่", "New network diagram");
-  const area = ($("#newArea").value === "__new" ? $("#newAreaText").value : $("#newArea").value).trim();
-  if (!area) { toast(L("เลือกพื้นที่ก่อน", "Choose an area first")); return; }
-  await newDiagram(title, area);
-});
-const newBtn = $("#newBtn");
-newBtn.addEventListener("click", () => openNewModal());
-async function newDiagram(title, area) {
-  if (!canEdit) return;
-  if (server) { if (!okToLeave()) return; await createOnServer({ version: 1, title, area, nodes: [], links: [], zones: [] }); return; }
-  checkpoint(); closeModals();
-  doc = { version: 1, title, area, nodes: [], links: [], zones: [] };
-  sel = null; afterDocSwap(); view = { x: 0, y: 0, k: 1 }; applyView();
-  toast(L("เริ่มผังใหม่แล้ว กด ย้อน ถ้าต้องการผังเดิมคืน", "Started a new diagram. Press Undo to get the old one back."));
-}
-
 /* ---------- Files: downloads ---------- */
 const dlPromise = (window.claude && typeof window.claude.use === "function") ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
 function safeName(ext) { return (doc.title || "network-diagram").replace(/[\\/:*?"<>|]+/g, "-").trim().slice(0, 80) + "." + ext; }
@@ -2787,24 +2730,6 @@ $("#jsonCopy").onclick = async () => {
   catch (e) { ta.focus(); ta.select(); toast(L("เลือกข้อความแล้ว กด Ctrl+C เพื่อคัดลอก", "Text selected. Press Ctrl+C to copy.")); }
 };
 $("#jsonSave").onclick = () => saveFile(safeName("json"), JSON.stringify(doc, null, 2), "application/json");
-function loadDoc(d) {
-  const nd = normalize(d);
-  checkpoint(); doc = nd; sel = null; afterDocSwap(); fit();
-}
-$("#jsonLoad").onclick = () => {
-  try { loadDoc(JSON.parse($("#jsonText").value)); closeModals(); persistNewOrCurrent(); toast(L("โหลดผังแล้ว", "Diagram loaded")); }
-  catch (e) { toast(L("อ่าน JSON ไม่ได้: ", "Couldn't read the JSON: ") + e.message); }
-};
-$("#jsonFile").addEventListener("change", async (e) => {
-  const f = e.target.files[0]; e.target.value = "";
-  if (!f) return;
-  try { loadDoc(JSON.parse(await f.text())); closeModals(); persistNewOrCurrent(); toast(L("เปิดไฟล์ ", "Opened ") + f.name + L(" แล้ว", "")); }
-  catch (err) { toast(L("เปิดไฟล์ไม่ได้: ", "Couldn't open the file: ") + err.message); }
-});
-async function persistNewOrCurrent() {
-  if (server) await createOnServer(doc, true); else persist();
-}
-
 /* ---------- Server diagrams ---------- */
 async function createOnServer(d, keepDoc) {
   if (!canEdit) return;
@@ -2836,7 +2761,6 @@ async function openFiles() {
 }
 $("#filesBtn").onclick = openFiles;
 $("#filesArea").addEventListener("change", openFiles);
-$("#filesNew").onclick = () => openNewModal();
 $("#filesList").addEventListener("click", async (e) => {
   const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
   if (o) await openDiagram(o.dataset.open);
