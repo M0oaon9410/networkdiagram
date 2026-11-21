@@ -22,13 +22,20 @@ docker compose up -d --build
 | อัปเดตหลังแก้ไฟล์ | `docker compose up -d --build` |
 | เปลี่ยนพอร์ต | แก้ `"8080:8080"` ใน `docker-compose.yml` เป็น เช่น `"9000:8080"` |
 
-ข้อมูลผังเก็บอยู่ใน Docker volume ชื่อ `netplan-data` (ไฟล์ละผังที่ `/data/<id>.json` ในคอนเทนเนอร์) จึงไม่หายเมื่อสั่ง `down` หรือ build ใหม่ ถ้าใช้ `docker compose down -v` ข้อมูลจะถูกลบทั้งหมด
+ข้อมูลทั้งหมดเก็บที่โฟลเดอร์ `./data` ในโปรเจกต์ (mount เป็น `/data` ในคอนเทนเนอร์) เปิดดูหรือ copy ได้จากข้างนอกโดยไม่ต้องเข้าคอนเทนเนอร์ และไม่หายเมื่อสั่ง `down` หรือ build ใหม่
+- `data/<id>.json` ไฟล์ละผัง
+- `data/auth/users.json`, `sessions.json`, `settings.json` บัญชีผู้ใช้ session และค่าตั้งค่าอีเมล
+- `data/auth/audit.log` บันทึกการใช้งาน
 
-สำรองข้อมูล:
+ไฟล์ใน `data/auth` เซิร์ฟเวอร์อ่านเก็บไว้ในหน่วยความจำและเขียนทับเมื่อมีการเปลี่ยน ถ้าจะแก้ด้วยมือให้ `docker compose stop netplan` ก่อน แก้เสร็จแล้วค่อย `docker compose start netplan` โฟลเดอร์ `data/` และ `backups/` ไม่ถูกส่งขึ้น git
+
+สำรองข้อมูล: `scripts/backup-data.sh` บีบอัด `data/` ไว้ที่ `backups/netplan-data-<วันเวลา>.tgz` และลบไฟล์ที่เก่ากว่า 30 วัน (ตั้งจำนวนวันได้ด้วย `KEEP_DAYS`) ตั้งให้รันทุกวันด้วย cron เช่น
 
 ```bash
-docker run --rm -v netplan_netplan-data:/data -v "$PWD":/backup alpine tar czf /backup/netplan-backup.tgz -C /data .
+30 2 * * * /home/api/networkdiagram/scripts/backup-data.sh >> /home/api/networkdiagram/backups/backup.log 2>&1
 ```
+
+กู้คืน: `docker compose stop netplan` แล้วแตกไฟล์สำรองทับ (`tar -xzf backups/netplan-data-<วันเวลา>.tgz`) จากนั้น `docker compose start netplan`
 
 ## ผู้ใช้และสิทธิ์การใช้งาน
 
@@ -51,7 +58,7 @@ docker run --rm -v netplan_netplan-data:/data -v "$PWD":/backup alpine tar czf /
 
 **บันทึกการใช้งาน (Activity log)** ผู้ดูแลระบบเปิดดูได้ที่เมนูชื่อผู้ใช้ → “บันทึกการใช้งาน” ระบบบันทึกการเข้าสู่ระบบ (ทั้งสำเร็จและไม่สำเร็จ พร้อม IP) การสมัคร การเปลี่ยนสิทธิ์ การลบผู้ใช้ การสร้าง/ลบผัง และการแก้ไขผังว่าเปลี่ยนอะไรบ้าง เช่น เพิ่ม/ลบอุปกรณ์ แก้ IP จากค่าเดิมเป็นค่าใหม่ การแก้ไขของคนเดียวกันในช่วงเวลาใกล้กันจะรวมเป็นรายการเดียว กรองตามผู้ใช้ ผัง ประเภท วันที่ หรือคำค้นได้ และส่งออกเป็น CSV ได้ ไฟล์ log อยู่ที่ `/data/auth/audit.log`
 
-ข้อมูลผู้ใช้เก็บที่ `/data/auth` ใน volume เดียวกับผัง (รหัสผ่านเก็บแบบ scrypt hash) ถ้าต้องการปิดระบบล็อกอินแบบเดิม ให้ตั้งตัวแปร `AUTH=off`
+ข้อมูลผู้ใช้เก็บที่ `data/auth` โฟลเดอร์เดียวกับผัง (รหัสผ่านเก็บแบบ scrypt hash) ถ้าต้องการปิดระบบล็อกอินแบบเดิม ให้ตั้งตัวแปร `AUTH=off`
 
 ## รันโดยไม่ใช้ Docker
 
@@ -108,7 +115,7 @@ API ต้องเข้าสู่ระบบก่อน (cookie `np_sid`) 
 1. **ใช้ HTTPS** วาง reverse proxy (เช่น Nginx, Caddy หรือ Cloudflare) ที่มีใบรับรอง SSL ไว้ข้างหน้า และให้ proxy ส่ง header `X-Forwarded-Proto: https` แล้วเปลี่ยน “ที่อยู่เว็บที่ใส่ในลิงก์อีเมล” เป็น `https://...`
    - ตั้งให้ proxy รับเฉพาะ TLS 1.2 ขึ้นไป (ปิด TLS 1.0/1.1) ถ้าใช้ Cloudflare: SSL/TLS → Edge Certificates → Minimum TLS Version = TLS 1.2 และเปิด Always Use HTTPS
 2. **ปิดพอร์ตตรง** ให้เข้าได้ผ่าน proxy เท่านั้น เช่น ผูกพอร์ตไว้ที่ `127.0.0.1:9000:8080` ใน docker-compose หรือปิดด้วย firewall
-3. **สำรองข้อมูล** volume `netplan-data` เป็นประจำ (มีทั้งผังและบัญชีผู้ใช้)
+3. **สำรองข้อมูล** โฟลเดอร์ `data/` เป็นประจำด้วย `scripts/backup-data.sh` (มีทั้งผังและบัญชีผู้ใช้) และเก็บสำเนาไว้นอกเครื่องด้วย
 4. ตั้งรหัสผ่าน admin ให้ยาว และอัปเดตระบบปฏิบัติการ/Docker สม่ำเสมอ
 
 ## โครงสร้างไฟล์
@@ -123,5 +130,6 @@ netplan/
 ├── lib/audit.js       บันทึกการใช้งาน
 ├── lib/live.js        แจ้งการแก้ไขสดและรายชื่อคนที่เปิดผังอยู่ (Server-Sent Events)
 ├── package.json
+├── scripts/backup-data.sh  สำรองโฟลเดอร์ data ลง backups (ใช้กับ cron)
 └── public/app.html    หน้าโปรแกรมทั้งหมด (HTML/CSS/JS ไฟล์เดียว)
 ```

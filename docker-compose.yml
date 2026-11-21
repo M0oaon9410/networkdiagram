@@ -6,7 +6,7 @@ services:
     ports:
       - "8088:8080"
     volumes:
-      - netplan-data:/data
+      - ./data:/data
     restart: unless-stopped
 
   proxy:
@@ -21,6 +21,3 @@ services:
     depends_on:
       - netplan
     restart: unless-stopped
-
-volumes:
-  netplan-data:

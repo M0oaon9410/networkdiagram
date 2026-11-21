@@ -1,5 +1,6 @@
 # Diagram data saved by the server (local runs)
 data/
+backups/
 *.tmp
 
 # Node
