@@ -1,5 +1,6 @@
 data
 backups
+test
 node_modules
 *.md
 .git

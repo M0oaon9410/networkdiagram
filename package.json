@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Network diagram editor with device details",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test --test-concurrency=1 test/api.test.js test/audit.test.js"
+  },
+  "engines": { "node": ">=22.5" },
   "license": "MIT"
 }
