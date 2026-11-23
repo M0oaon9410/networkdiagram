@@ -1861,6 +1861,20 @@ function langField(val) {
     + `<select id="f_lang_pick" data-langpick><option value=""${val ? "" : " selected"}>${L("— เลือก —", "— choose —")}</option>${LANGS.map((v) => `<option value="${esc(v)}"${v === val ? " selected" : ""}>${esc(v)}</option>`).join("")}<option value="__other"${custom ? " selected" : ""}>${L("อื่น ๆ (พิมพ์เอง)…", "Other (type it)…")}</option></select>`
     + `<input id="f_lang" data-field="lang" value="${esc(custom ? val : "")}" placeholder="${L("พิมพ์ภาษาที่ใช้พัฒนา", "Type the language")}" autocomplete="off" spellcheck="false" style="margin-top:6px"${custom ? "" : " hidden"}></div>`;
 }
+// Antivirus / EDR products, grouped like the OS list; "Other" keeps free text (older values show there)
+const AV_GROUPS = [
+  ["EDR / XDR", ["Microsoft Defender for Endpoint", "CrowdStrike Falcon", "SentinelOne Singularity", "Trend Micro Vision One", "Sophos Intercept X", "Palo Alto Cortex XDR", "Cisco Secure Endpoint", "Trellix Endpoint Security (HX)", "Bitdefender GravityZone", "ESET PROTECT / ESET Inspect", "Kaspersky Endpoint Detection and Response", "Symantec Endpoint Security (Broadcom)", "VMware Carbon Black", "Fortinet FortiEDR", "Check Point Harmony Endpoint", "Cybereason", "Elastic Security", "Wazuh"]],
+  ["Antivirus", ["Microsoft Defender Antivirus", "Trend Micro Apex One", "Kaspersky Endpoint Security", "ESET Endpoint Security", "Sophos Endpoint", "Symantec Endpoint Protection", "McAfee / Trellix ENS", "Bitdefender Endpoint Security", "Avast / AVG Business", "ClamAV"]],
+  ["None", ["Not installed", "Not supported (network device / appliance)"]],
+];
+const AV_LIST = new Set(AV_GROUPS.flatMap(([, list]) => list));
+function avField(val) {
+  const custom = !!val && !AV_LIST.has(val);
+  const opts = AV_GROUPS.map(([g, list]) => `<optgroup label="${esc(g)}">${list.map((v) => `<option value="${esc(v)}"${v === val ? " selected" : ""}>${esc(v)}</option>`).join("")}</optgroup>`).join("");
+  return `<div class="f full"><label for="f_av_pick">Antivirus / EDR</label>`
+    + `<select id="f_av_pick" data-avpick><option value=""${val ? "" : " selected"}>${L("— เลือก —", "— choose —")}</option>${opts}<option value="__other"${custom ? " selected" : ""}>${L("อื่น ๆ (พิมพ์เอง)…", "Other (type it)…")}</option></select>`
+    + `<input id="f_av" data-field="antivirus" value="${esc(custom ? val : "")}" placeholder="${L("พิมพ์ชื่อ Antivirus / EDR", "Type the antivirus / EDR")}" autocomplete="off" spellcheck="false" style="margin-top:6px"${custom ? "" : " hidden"}></div>`;
+}
 function osField(val) {
   const custom = !!val && !OS_LIST.has(val);
   const opts = OS_GROUPS.map(([g, list]) => `<optgroup label="${esc(g)}">${list.map((v) => `<option value="${esc(v)}"${v === val ? " selected" : ""}>${esc(v)}</option>`).join("")}</optgroup>`).join("");
@@ -1970,7 +1984,7 @@ function renderInspector() {
     h += osField(n.os);
     h += siteField(n.location);
     h += `</div><div class="sec">Protection</div><div class="fields">`;
-    h += field("Antivirus / EDR", "antivirus", n.antivirus || "", { full: true, ph: L("เช่น Microsoft Defender for Endpoint, CrowdStrike Falcon", "e.g. Microsoft Defender for Endpoint, CrowdStrike Falcon") });
+    h += avField(n.antivirus || "");
     h += `</div><div class="sec">${L("ซอฟต์แวร์", "Software")}</div><div class="fields">`;
     h += field("Database", "database", n.database || "", { full: true, ph: L("เช่น MySQL, PostgreSQL, SQL Server", "e.g. MySQL, PostgreSQL, SQL Server") });
     h += langField(n.lang || "");
@@ -2128,6 +2142,10 @@ inspector.addEventListener("input", (e) => {
     const box = inspector.querySelector("#f_os");
     if (el.value === "__other") { box.hidden = false; box.focus(); obj.os = box.value; }
     else { box.hidden = true; box.value = ""; obj.os = el.value; }
+  } else if (el.dataset.avpick != null) {
+    const box = inspector.querySelector("#f_av");
+    if (el.value === "__other") { box.hidden = false; box.focus(); obj.antivirus = box.value; }
+    else { box.hidden = true; box.value = ""; obj.antivirus = el.value; }
   } else if (el.dataset.langpick != null) {
     const box = inspector.querySelector("#f_lang");
     if (el.value === "__other") { box.hidden = false; box.focus(); obj.lang = box.value; }
