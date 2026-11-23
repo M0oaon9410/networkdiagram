@@ -120,3 +120,12 @@ test("activity log", async (t) => {
     assert.deepEqual(after[1].changes, [{ op: "edit", kind: "title", field: "title", from: "Test diagram", to: "renamed" }]);
   });
 });
+
+test("development languages: an old single language and the same list read the same, changes show as one line", () => {
+  const { diffDiagrams } = require("../lib/audit");
+  const node = (f) => ({ id: "n1", type: "server", name: "WEB-01", x: 0, y: 0, ...f });
+  const doc = (f) => ({ nodes: [node(f)], links: [], zones: [] });
+  assert.deepEqual(diffDiagrams(doc({ lang: "PHP", langVer: "8.3" }), doc({ langs: [{ lang: "PHP", ver: "8.3" }] })), []);
+  assert.deepEqual(diffDiagrams(doc({ langs: [{ lang: "PHP", ver: "8.3" }] }), doc({ langs: [{ lang: "PHP", ver: "8.3" }, { lang: "Node.js", ver: "20" }, { lang: "", ver: "" }] })),
+    [{ op: "edit", kind: "node", name: "WEB-01", field: "langs", from: "PHP 8.3", to: "PHP 8.3, Node.js 20" }]);
+});
