@@ -571,7 +571,7 @@ const ZONE_COLOR_LABELS = { blue: "น้ำเงิน", green: "เขีย�
 
 /* ---------- Sample ---------- */
 function sample() {
-  const n = (id, type, x, y, f = {}) => ({ id, type, x, y, name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", antivirus: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [], ...f });
+  const n = (id, type, x, y, f = {}) => ({ id, type, x, y, name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", antivirus: "", os: "", location: "", database: "", lang: "", langVer: "", nginx: "", status: "active", notes: "", extra: {}, custom: [], ...f });
   const l = (from, to, kind, f = {}) => ({ id: "l_" + from + "_" + to, from, to, kind, label: "", fromPort: "", toPort: "", notes: "", ...f });
   return {
     version: 1,
@@ -688,7 +688,7 @@ function normalize(d) {
   };
   for (const n of d.nodes) {
     if (!n || !n.id) continue;
-    out.nodes.push({ name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", antivirus: "", os: "", location: "", status: "active", notes: "",
+    out.nodes.push({ name: "", ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", antivirus: "", os: "", location: "", database: "", lang: "", langVer: "", nginx: "", status: "active", notes: "",
       ...n, servicePort: String(n.servicePort || (n.extra && n.extra.svcPort) || ""), type: TYPES[n.type] ? n.type : "server", x: +n.x || 0, y: +n.y || 0, extra: (({ svcPort, ...e }) => e)(n.extra || {}), custom: Array.isArray(n.custom) ? n.custom.map((c) => ({ k: String(c.k ?? ""), v: String(c.v ?? "") })) : [], id: safeId(n.id, "n") });
   }
   for (const z of d.zones || []) {
@@ -1824,7 +1824,7 @@ function nextName(type) {
 function addNode(type, x, y) {
   if (!canEdit) return;
   checkpoint();
-  const n = { id: uid("n"), type, x, y, name: nextName(type), ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", antivirus: "", os: "", location: "", status: "active", notes: "", extra: {}, custom: [] };
+  const n = { id: uid("n"), type, x, y, name: nextName(type), ip: "", mask: "", gateway: "", vlan: "", mac: "", vendor: "", model: "", serial: "", platform: "", servicePort: "", antivirus: "", os: "", location: "", database: "", lang: "", langVer: "", nginx: "", status: "active", notes: "", extra: {}, custom: [] };
   doc.nodes.push(n);
   sel = { kind: "node", id: n.id };
   render(); renderInspector(); persist();
@@ -1845,6 +1845,7 @@ const OS_GROUPS = [
 ];
 const OS_LIST = new Set(OS_GROUPS.flatMap(([, list]) => list));
 const PLATFORMS = ["Nutanix", "VMware", "Proxmox"];
+const LANGS = ["PHP", "Python", "Node.js", "Java", "Go", "C#", ".NET", "Ruby", "Perl", "TypeScript", "JavaScript", "ASP.NET", "VB.NET", "C / C++", "Rust", "Kotlin", "Swift"];
 const SITES = ["ศาลาลูกขุนใน วังหลวง", "อาคาร 603 สนามเสือป่า", "อาคาร 614 สนามเสือป่า", "โครงการส่วนพระองค์ สวนจิตรลดา", "อพสธ. สวนจิตรลดา", "กองงาน 905 สวนจิตรลดา", "กรส. คนไข้ สวนจิตรลดา"];
 // Installation site: pick from the list, or "Other" to type any place (older free-text values show there)
 function siteField(val) {
@@ -1852,6 +1853,12 @@ function siteField(val) {
   return `<div class="f full"><label for="f_loc_pick">${L("สถานที่ติดตั้ง", "Installation site")}</label>`
     + `<select id="f_loc_pick" data-locpick><option value=""${val ? "" : " selected"}>${L("— เลือก —", "— choose —")}</option>${SITES.map((v) => `<option value="${esc(v)}"${v === val ? " selected" : ""}>${esc(v)}</option>`).join("")}<option value="__other"${custom ? " selected" : ""}>${L("อื่น ๆ (พิมพ์เอง)…", "Other (type it)…")}</option></select>`
     + `<input id="f_location" data-field="location" value="${esc(custom ? val : "")}" placeholder="${L("พิมพ์สถานที่ติดตั้ง", "Type the installation site")}" autocomplete="off" style="margin-top:6px"${custom ? "" : " hidden"}></div>`;
+}
+function langField(val) {
+  const custom = !!val && !LANGS.includes(val);
+  return `<div class="f full"><label for="f_lang_pick">${L("ภาษาที่ใช้พัฒนา", "Development language")}</label>`
+    + `<select id="f_lang_pick" data-langpick><option value=""${val ? "" : " selected"}>${L("— เลือก —", "— choose —")}</option>${LANGS.map((v) => `<option value="${esc(v)}"${v === val ? " selected" : ""}>${esc(v)}</option>`).join("")}<option value="__other"${custom ? " selected" : ""}>${L("อื่น ๆ (พิมพ์เอง)…", "Other (type it)…")}</option></select>`
+    + `<input id="f_lang" data-field="lang" value="${esc(custom ? val : "")}" placeholder="${L("พิมพ์ภาษาที่ใช้พัฒนา", "Type the language")}" autocomplete="off" spellcheck="false" style="margin-top:6px"${custom ? "" : " hidden"}></div>`;
 }
 function osField(val) {
   const custom = !!val && !OS_LIST.has(val);
@@ -1963,6 +1970,11 @@ function renderInspector() {
     h += siteField(n.location);
     h += `</div><div class="sec">Protection</div><div class="fields">`;
     h += field("Antivirus / EDR", "antivirus", n.antivirus || "", { full: true, ph: L("เช่น Microsoft Defender for Endpoint, CrowdStrike Falcon", "e.g. Microsoft Defender for Endpoint, CrowdStrike Falcon") });
+    h += `</div><div class="sec">${L("ซอฟต์แวร์", "Software")}</div><div class="fields">`;
+    h += field("Database", "database", n.database || "", { full: true, ph: L("เช่น MySQL, PostgreSQL, SQL Server", "e.g. MySQL, PostgreSQL, SQL Server") });
+    h += langField(n.lang || "");
+    h += field(L("เวอร์ชันภาษา", "Language version"), "langVer", n.langVer || "", { ph: "8.3" });
+    h += field("Nginx version", "nginx", n.nginx || "", { ph: "1.26.2" });
     h += `</div><div class="sec">${L("เฉพาะ", "")} ${esc(t.label)}${L("", " details")}</div><div class="fields">`;
     for (const k of t.extra) h += field(EXTRA_LABELS[k] || k, "extra." + k, n.extra[k] || "");
     h += `</div><div class="sec">${L("ฟิลด์เพิ่มเติม", "Custom fields")}</div><div id="customRows">`;
@@ -2115,6 +2127,10 @@ inspector.addEventListener("input", (e) => {
     const box = inspector.querySelector("#f_os");
     if (el.value === "__other") { box.hidden = false; box.focus(); obj.os = box.value; }
     else { box.hidden = true; box.value = ""; obj.os = el.value; }
+  } else if (el.dataset.langpick != null) {
+    const box = inspector.querySelector("#f_lang");
+    if (el.value === "__other") { box.hidden = false; box.focus(); obj.lang = box.value; }
+    else { box.hidden = true; box.value = ""; obj.lang = el.value; }
   } else if (el.dataset.field) {
     const f = el.dataset.field;
     if (f.startsWith("extra.")) obj.extra[f.slice(6)] = el.value;
@@ -2664,7 +2680,7 @@ function exportPNG() {
   }));
 }
 function exportCSV() {
-  const cols = [["name", L("ชื่อ", "Name")], ["type", L("ชนิด", "Type")], ["status", L("สถานะ", "Status")], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["servicePort", "Service port"], ["vendor", L("ยี่ห้อ", "Vendor")], ["model", L("รุ่น", "Model")], ["serial", "Serial"], ["platform", "Hypervisor / Virtualization Platform"], ["os", "OS/Firmware"], ["antivirus", "Antivirus/EDR"], ["location", L("สถานที่ติดตั้ง", "Installation site")], ["extra", L("ข้อมูลเฉพาะ", "Type details")], ["custom", L("ฟิลด์เพิ่มเติม", "Custom fields")], ["links", L("เชื่อมต่อกับ", "Connected to")], ["notes", L("หมายเหตุ", "Notes")]];
+  const cols = [["name", L("ชื่อ", "Name")], ["type", L("ชนิด", "Type")], ["status", L("สถานะ", "Status")], ["ip", "IP"], ["mask", "Subnet"], ["gateway", "Gateway"], ["vlan", "VLAN"], ["mac", "MAC"], ["servicePort", "Service port"], ["vendor", L("ยี่ห้อ", "Vendor")], ["model", L("รุ่น", "Model")], ["serial", "Serial"], ["platform", "Hypervisor / Virtualization Platform"], ["os", "OS/Firmware"], ["antivirus", "Antivirus/EDR"], ["database", "Database"], ["lang", L("ภาษาที่ใช้พัฒนา", "Development language")], ["langVer", L("เวอร์ชันภาษา", "Language version")], ["nginx", "Nginx version"], ["location", L("สถานที่ติดตั้ง", "Installation site")], ["extra", L("ข้อมูลเฉพาะ", "Type details")], ["custom", L("ฟิลด์เพิ่มเติม", "Custom fields")], ["links", L("เชื่อมต่อกับ", "Connected to")], ["notes", L("หมายเหตุ", "Notes")]];
   const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
   const rows = [cols.map((c) => q(c[1])).join(",")];
   for (const n of doc.nodes) {
@@ -2751,7 +2767,7 @@ const normText = (s) => String(s ?? "").normalize("NFC").toLocaleLowerCase("th")
 function searchFields(n) {
   const t = TYPES[n.type];
   const f = [["", n.name], [L("ชนิด", "Type"), t.label], ["IP", n.ip], ["Subnet", n.mask], ["Gateway", n.gateway], ["VLAN", n.vlan], ["MAC", n.mac],
-    ["Service port", n.servicePort], [L("ยี่ห้อ", "Vendor"), n.vendor], [L("รุ่น", "Model"), n.model], ["Serial", n.serial], ["Hypervisor", n.platform], ["OS", n.os], ["Antivirus / EDR", n.antivirus], [L("สถานที่ติดตั้ง", "Installation site"), n.location], [L("สถานะ", "Status"), STATUS[n.status]?.label], [L("หมายเหตุ", "Notes"), n.notes]];
+    ["Service port", n.servicePort], [L("ยี่ห้อ", "Vendor"), n.vendor], [L("รุ่น", "Model"), n.model], ["Serial", n.serial], ["Hypervisor", n.platform], ["OS", n.os], ["Antivirus / EDR", n.antivirus], ["Database", n.database], [L("ภาษา", "Language"), n.lang], [L("เวอร์ชันภาษา", "Language version"), n.langVer], ["Nginx", n.nginx], [L("สถานที่ติดตั้ง", "Installation site"), n.location], [L("สถานะ", "Status"), STATUS[n.status]?.label], [L("หมายเหตุ", "Notes"), n.notes]];
   for (const k of t.extra) f.push([EXTRA_LABELS[k] || k, n.extra[k]]);
   for (const c of n.custom) f.push([c.k || L("ฟิลด์", "Field"), c.v], [L("ฟิลด์", "Field"), c.k]);
   return f.filter(([, v]) => v);
@@ -3086,7 +3102,7 @@ const AUDIT_ACTIONS = {
 };
 const AUDIT_FIELDS = {
   name: ["ชื่อ", "name"], type: ["ชนิด", "type"], ip: ["IP", "IP"], mask: ["Subnet", "subnet"], gateway: ["Gateway", "gateway"], vlan: ["VLAN", "VLAN"],
-  mac: ["MAC", "MAC"], servicePort: ["Service port", "service port"], vendor: ["ยี่ห้อ", "vendor"], model: ["รุ่น", "model"], serial: ["Serial", "serial"], platform: ["Hypervisor / Virtualization Platform", "hypervisor / virtualization platform"], os: ["OS", "OS"], antivirus: ["Antivirus / EDR", "antivirus / EDR"], location: ["สถานที่ติดตั้ง", "installation site"],
+  mac: ["MAC", "MAC"], servicePort: ["Service port", "service port"], vendor: ["ยี่ห้อ", "vendor"], model: ["รุ่น", "model"], serial: ["Serial", "serial"], platform: ["Hypervisor / Virtualization Platform", "hypervisor / virtualization platform"], os: ["OS", "OS"], antivirus: ["Antivirus / EDR", "antivirus / EDR"], database: ["Database", "database"], lang: ["ภาษาที่ใช้พัฒนา", "development language"], langVer: ["เวอร์ชันภาษา", "language version"], nginx: ["Nginx version", "nginx version"], location: ["สถานที่ติดตั้ง", "installation site"],
   status: ["สถานะ", "status"], notes: ["หมายเหตุ", "notes"], color: ["สี", "color"], custom: ["ฟิลด์เพิ่มเติม", "custom fields"], kind: ["ชนิดสาย", "cable type"],
   label: ["ป้ายบนสาย", "label"], fromPort: ["พอร์ตต้นทาง", "port A"], toPort: ["พอร์ตปลายทาง", "port B"], route: ["รูปแบบเส้น", "line style"], ends: ["ปลายสาย", "ends"],
 };
