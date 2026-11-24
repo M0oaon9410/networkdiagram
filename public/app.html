@@ -1979,6 +1979,9 @@ function multiPanel() {
   h += `<div class="fields">${colorField(first, nodes.some((n) => n.color), nodes.length > 0)}`;
   if (nodes.length) {
     h += `<div class="f full"><label for="f_mstatus">${L("สถานะอุปกรณ์ทั้งหมด", "Status of all devices")}</label><select id="f_mstatus" data-mstatus><option value="">${L("— คงเดิม —", "— leave as is —")}</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("")}</select></div>`;
+    // one installation site for every picked device (Ctrl+A picks the whole diagram)
+    const locs = new Set(nodes.map((n) => n.location || "")), same = locs.size === 1 ? [...locs][0] : null;
+    h += `<div class="f full"><label for="f_mloc">${L(`สถานที่ติดตั้งของอุปกรณ์ทั้ง ${nodes.length} ชิ้น`, `Installation site of all ${nodes.length} devices`)}</label><select id="f_mloc" data-mloc><option value="">${same == null ? L("— หลายสถานที่ (คงเดิม) —", "— mixed (leave as is) —") : same ? L("— คงเดิม —", "— leave as is —") : L("— ยังไม่ระบุ (คงเดิม) —", "— not set (leave as is) —")}</option>${SITES.map((v) => `<option value="${esc(v)}"${v === same ? " selected" : ""}>${esc(v)}</option>`).join("")}</select></div>`;
   }
   h += `</div><p class="muted" style="font-size:12.5px;line-height:1.55">${L("ลากชิ้นใดก็ได้ในกลุ่มเพื่อย้ายทั้งหมด · ปุ่มลูกศรเลื่อนทั้งกลุ่ม · Shift+คลิกเพื่อเพิ่มหรือเอาออก · Esc เพื่อยกเลิกการเลือก", "Drag any picked item to move them all · arrow keys nudge the group · Shift+click adds or removes · Esc clears")}</p>`;
   h += `<div class="list">${keys.map((k) => { const o = keyExists(k); return `<button class="btn" data-pick="${k}" style="justify-content:flex-start;width:100%;white-space:normal;text-align:left">${esc(k[0] === "n" ? o.name || TYPES[o.type].label : o.name || L("โซน", "Zone"))}<span class="muted" style="margin-left:auto">${esc(k[0] === "n" ? TYPES[o.type].label : L("โซน", "Zone"))}</span></button>`; }).join("")}</div>`;
@@ -2160,6 +2163,13 @@ inspector.addEventListener("input", (e) => {
       if (other) other.value = v.toLowerCase();
     } else if (el.dataset.mstatus != null && el.value) {
       for (const k of multi) if (k[0] === "n") findNode(k.slice(2)).status = el.value;
+    } else if (el.dataset.mloc != null && el.value) {
+      // its own undo step, so one Ctrl+Z puts every device's old site back
+      checkpoint();
+      let n = 0;
+      for (const k of multi) if (k[0] === "n") { findNode(k.slice(2)).location = el.value; n++; }
+      if (editSnapshot) editSnapshot = JSON.stringify(doc);
+      toast(L(`ตั้งสถานที่ติดตั้งให้อุปกรณ์ ${n} ชิ้นแล้ว`, `Installation site set for ${n} devices`));
     }
     render(); persist(); return;
   }
