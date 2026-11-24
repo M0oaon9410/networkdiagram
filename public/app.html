@@ -122,6 +122,8 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .sbar.v i { left: 2px; right: 2px; min-height: 24px; }
 .sbar i:hover, .sbar i.on { background: color-mix(in srgb, var(--fg) 45%, transparent); }
 .sbar i.on { cursor: grabbing; }
+.warn-tip { position: absolute; z-index: 30; pointer-events: none; max-width: 260px; padding: 6px 10px; border-radius: 7px; background: #c2392b; color: #fff; font-size: 12.5px; font-weight: 600; line-height: 1.45; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.warn-tip small { display: block; font-weight: 400; opacity: .9; }
 .stage-top { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; pointer-events: none; }
 .stage-top > * { pointer-events: auto; }
 .hint { flex: 0 1 auto; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--muted); }
@@ -371,6 +373,7 @@ body.insp-hidden { --insp-w: 0px; }
   <div class="main">
     <aside class="palette" id="palette" aria-label="อุปกรณ์"></aside>
     <section class="stage" id="stage">
+      <div class="warn-tip" id="warnTip" role="tooltip" hidden></div>
       <svg id="canvas" class="mode-select" aria-label="พื้นที่วาดผังเครือข่าย">
         <defs>
           <pattern id="gridDots" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -663,6 +666,31 @@ let canEdit = true;            // false for read-only (viewer) accounts
 
 const $ = (s) => document.querySelector(s);
 const svg = $("#canvas"), world = $("#world"), inspector = $("#inspector");
+
+// Hovering a device shows a red note when its Time sync (NTP server) is still empty.
+// The internet / cloud symbol is skipped: it is not a device anyone configures.
+const warnTip = $("#warnTip");
+function missingInfo(n) {
+  const out = [];
+  if (n.type !== "internet" && !String(n.timeSync || "").trim()) out.push("Time sync");
+  return out;
+}
+function hideWarnTip() { warnTip.hidden = true; }
+svg.addEventListener("pointermove", (e) => {
+  const g = e.buttons ? null : e.target.closest("g.node[data-id]");
+  const n = g && findNode(g.dataset.id);
+  const miss = n ? missingInfo(n) : [];
+  if (!miss.length) return hideWarnTip();
+  warnTip.innerHTML = `${esc(L(`ยังไม่ได้ใส่ข้อมูล (${miss.join(", ")})`, `Not filled in yet (${miss.join(", ")})`))}<small>${esc(n.name || TYPES[n.type].label)}</small>`;
+  warnTip.hidden = false;
+  const box = $("#stage").getBoundingClientRect();
+  let x = e.clientX - box.left + 14, y = e.clientY - box.top + 16;
+  if (x + warnTip.offsetWidth > box.width - 8) x = e.clientX - box.left - warnTip.offsetWidth - 10;
+  if (y + warnTip.offsetHeight > box.height - 8) y = e.clientY - box.top - warnTip.offsetHeight - 10;
+  warnTip.style.left = x + "px"; warnTip.style.top = y + "px";
+});
+svg.addEventListener("pointerleave", hideWarnTip);
+svg.addEventListener("pointerdown", hideWarnTip);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const uid = (p) => p + "_" + Math.random().toString(36).slice(2, 9);
 const snap = (v) => Math.round(v / 10) * 10;
