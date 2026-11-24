@@ -1,4 +1,4 @@
-<title>NetPlan</title>
+<title>AON · Asset and Operational Network</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* Fonts ship with the app (public/fonts, SIL OFL) so Thai renders the same with no internet access. */
@@ -56,6 +56,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .02em; margin-right: 4px; }
 .brand svg { width: 22px; height: 22px; }
+.brand-full { display: block; font-size: 11.5px; font-weight: 500; letter-spacing: 0; color: var(--muted); }
 .title-input { min-width: 0; width: 260px; max-width: 100%; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 5px 8px; font-weight: 600; }
 .title-input:hover, .title-input:focus { border-color: var(--line); background: var(--panel-2); }
 .sep { width: 1px; height: 24px; background: var(--line); }
@@ -312,9 +313,9 @@ body.insp-hidden { --insp-w: 0px; }
 
 <div class="app">
   <header class="bar">
-    <div class="brand" aria-label="NetPlan">
+    <div class="brand" aria-label="AON — Asset and Operational Network" title="AON — Asset and Operational Network">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="5" rx="1"/><rect x="2.5" y="16.5" width="6" height="5" rx="1"/><rect x="15.5" y="16.5" width="6" height="5" rx="1"/><path d="M12 7.5v4.5M5.5 16.5V12h13v4.5"/></svg>
-      NetPlan
+      AON
     </div>
     <input id="docTitle" class="title-input" aria-label="ชื่อผัง" maxlength="120">
     <div class="sep hide-sm"></div>
@@ -2944,7 +2945,7 @@ function renderAuth() {
   const { view, note, email } = authView;
   const f = (id, label, type, ac, val = "") => `<div class="f"><label for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" autocomplete="${ac}" value="${esc(val)}" required${type === "password" ? ' minlength="8"' : ""}></div>`;
   const langSeg = `<div class="grp seg" role="group" aria-label="ภาษา / Language"><button class="btn" type="button" data-alang="th" aria-pressed="${lang === "th"}">ไทย</button><button class="btn" type="button" data-alang="en" aria-pressed="${lang === "en"}">EN</button></div>`;
-  let h = `<div class="auth-top"><div class="brand">${$(".brand svg").outerHTML}NetPlan</div>${langSeg}</div>`;
+  let h = `<div class="auth-top"><div class="brand">${$(".brand svg").outerHTML}<span>AON<small class="brand-full">Asset and Operational Network</small></span></div>${langSeg}</div>`;
   if (view === "login") {
     h += `<h1>${L("เข้าสู่ระบบ", "Sign in")}</h1>${noteHtml(note)}`;
     if (note && note.resend) h += `<button class="btn" type="button" data-go="resend">${L("ส่งอีเมลยืนยันอีกครั้ง", "Send the verification e-mail again")}</button>`;
@@ -3092,7 +3093,7 @@ async function openUsers() {
     + `<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${cfg.mailReady ? L("ตั้งค่าแล้ว ระบบจะส่งลิงก์ยืนยันและลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล", "Set up. Verification and password links are sent by e-mail.") : L("ยังไม่ได้ตั้งค่า ระหว่างนี้ลิงก์ยืนยันจะแสดงใน log ของเซิร์ฟเวอร์ (docker compose logs) หรือกด “ยืนยันให้” ที่รายชื่อด้านบน", "Not set up. Until then, links appear in the server log (docker compose logs), or press “Verify” in the list above.")}</p>`
     + `<form id="smtpForm"><div class="fields">${inp("s_host", L("เซิร์ฟเวอร์ SMTP", "SMTP server"), s.host, { ph: "smtp.gmail.com" })}${inp("s_port", L("พอร์ต", "Port"), s.port, { ph: "587", type: "number" })}`
     + `${inp("s_user", L("ชื่อผู้ใช้", "Username"), s.user, { ph: "you@example.com" })}${inp("s_pass", L("รหัสผ่าน / App password", "Password / app password"), "", { type: "password", ph: s.hasPass ? L("บันทึกไว้แล้ว (เว้นว่างถ้าไม่เปลี่ยน)", "saved (leave blank to keep)") : "" })}`
-    + `${inp("s_from", L("ผู้ส่ง (From)", "Sender (From)"), s.from, { ph: "NetPlan <you@example.com>", full: true })}`
+    + `${inp("s_from", L("ผู้ส่ง (From)", "Sender (From)"), s.from, { ph: "AON <you@example.com>", full: true })}`
     + `<label class="check" style="grid-column:1/-1"><input type="checkbox" id="s_secure"${s.secure ? " checked" : ""}> ${L("ใช้ SSL/TLS ตั้งแต่เริ่มเชื่อมต่อ (พอร์ต 465) ถ้าไม่เลือกจะใช้ STARTTLS (พอร์ต 587)", "Use SSL/TLS from the start (port 465). Otherwise STARTTLS (port 587) is used.")}</label>`
     + `${inp("s_url", L("ที่อยู่เว็บที่ใส่ในลิงก์อีเมล", "Web address used in e-mail links"), cfg.appUrl, { ph: "http://192.168.1.10:8088", full: true, mono: true })}</div>`
     + `<div class="actions"><button class="btn primary">${L("บันทึกการตั้งค่า", "Save settings")}</button><button class="btn" type="button" id="smtpTest">${L("ส่งอีเมลทดสอบถึงตัวเอง", "Send me a test e-mail")}</button><div class="spacer"></div><button class="btn" type="button" data-close>${L("ปิด", "Close")}</button></div></form>`;

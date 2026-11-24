@@ -1,4 +1,4 @@
-// Starts a real NetPlan server on a free port with its own data folder, and talks to it like the page does.
+// Starts a real AON server on a free port with its own data folder, and talks to it like the page does.
 "use strict";
 const { spawn } = require("node:child_process");
 const net = require("node:net");
@@ -29,7 +29,7 @@ async function startServer({ dataDir = tempDir(), env = {} } = {}) {
   child.stderr.on("data", (c) => { output += c; });
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("server did not start:\n" + output)), 10000);
-    child.stdout.on("data", () => { if (output.includes("NetPlan running")) { clearTimeout(timer); resolve(); } });
+    child.stdout.on("data", () => { if (output.includes("AON running")) { clearTimeout(timer); resolve(); } });
     child.on("exit", (code) => { clearTimeout(timer); reject(new Error(`server exited (${code}):\n${output}`)); });
   });
   const stop = () => new Promise((resolve) => {

@@ -1,4 +1,4 @@
-// NetPlan server: serves the diagram editor and stores diagrams as JSON files.
+// AON (Asset and Operational Network, formerly NetPlan) server: serves the diagram editor and stores diagrams as JSON files.
 // No external dependencies, Node.js 24+ (the audit log uses the built-in node:sqlite).
 "use strict";
 const http = require("http");
@@ -259,6 +259,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`NetPlan running on http://localhost:${PORT} (data: ${DATA_DIR}, login ${AUTH_ON ? "on" : "off"})`));
+server.listen(PORT, () => console.log(`AON running on http://localhost:${PORT} (data: ${DATA_DIR}, login ${AUTH_ON ? "on" : "off"})`));
 // write any gathered diagram edits to the audit log before stopping
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { live.closeAll(); audit.flushAll().finally(() => server.close(() => { audit.close(); process.exit(0); })); setTimeout(() => process.exit(0), 3000).unref(); });
