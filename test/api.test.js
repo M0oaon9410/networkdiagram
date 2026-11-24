@@ -272,3 +272,23 @@ test("live updates", async (t) => {
   await editor.del("/api/diagrams/" + id);
   assert.equal((await nextEvent("deleted")).by.name, "editor");
 });
+
+test("an admin sets a new password for another user", async (t) => {
+  const srv = await startServer();
+  t.after(srv.stop);
+  const admin = await signUpAdmin(srv.base);
+  const ed = await addUser(srv.base, admin, "ed", "editor");
+  const id = ed.user.id;
+  assert.equal((await admin.patch("/api/users/" + id, { password: "short" })).body.error, "weak_password");
+  assert.equal((await admin.patch("/api/users/" + admin.user.id, { password: "another-pass-9" })).body.error, "self");
+  assert.equal((await ed.patch("/api/users/" + id, { password: "another-pass-9" })).status, 403);
+  assert.equal((await admin.patch("/api/users/" + id, { password: "another-pass-9" })).status, 200);
+  // the user's open sessions end, the old password stops working and the new one works
+  assert.equal((await ed.get("/api/me")).status, 401);
+  const c = client(srv.base);
+  assert.equal((await c.post("/api/auth/login", { email: "ed@example.com", password: PASSWORD })).status, 401);
+  assert.equal((await c.post("/api/auth/login", { email: "ed@example.com", password: "another-pass-9" })).status, 200);
+  const log = (await admin.get("/api/audit?group=admin")).body;
+  assert.equal(log[0].action, "admin.password");
+  assert.equal(log[0].target.email, "ed@example.com");
+});

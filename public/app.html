@@ -251,6 +251,10 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .mfa-secret { font-family: var(--font-mono); font-size: 13px; letter-spacing: .06em; word-break: break-all; text-align: center; user-select: all; }
 .mfa-codes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 8px; font-family: var(--font-mono); font-size: 14.5px; letter-spacing: .04em; user-select: all; }
 .code-input { font-family: var(--font-mono); font-size: 20px !important; letter-spacing: .25em; text-align: center; }
+.upw-form { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: end; padding-top: 8px; border-top: 1px dashed var(--line); }
+.upw-form input { font-family: var(--font-mono); }
+.upw-form .upw-hint { grid-column: 1 / -1; margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+@media (max-width: 860px) { .upw-form { grid-template-columns: 1fr 1fr; } .upw-form .f { grid-column: 1 / -1; } }
 .mfa-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); margin-left: 4px; }
 .mfa-tag.on { border-color: #2f9e5a; color: #2f9e5a; }
 .usermenu { position: relative; }
@@ -3177,8 +3181,11 @@ async function openUsers() {
   } catch (err) { box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(errNote("network"))}<div class="actions"><div class="spacer"></div><button class="btn" data-close>${L("ปิด", "Close")}</button></div>`; return; }
   const roleSel = (u) => `<select class="sel-sm" data-urole="${esc(u.id)}" aria-label="${L("สิทธิ์ของ", "Role of")} ${esc(u.name)}">${["admin", "editor", "viewer", "pending"].map((r) => `<option value="${r}"${u.role === r ? " selected" : ""}>${esc(roleLabel(r))}</option>`).join("")}</select>`;
   const rows = list.map((u) => `<div class="user-row"><div><b>${esc(u.name)}${u.id === me.id ? L(" (คุณ)", " (you)") : ""}</b><small>${esc(u.email)} · ${u.verified ? L("ยืนยันอีเมลแล้ว", "verified") : L("รอยืนยันอีเมล", "waiting for e-mail verification")} · MFA ${u.mfa ? L("เปิด", "on") : u.mfaSetupRequired ? L("ยังไม่ตั้งค่า (บังคับ)", "not set up (required)") : L("ปิด", "off")}${u.lastLogin ? " · " + L("เข้าล่าสุด ", "last sign-in ") + esc(new Date(u.lastLogin).toLocaleString(L("th-TH", "en-GB"))) : ""}</small></div>`
-    + `<div class="grp">${roleSel(u)}${u.verified ? "" : `<button class="btn" data-uverify="${esc(u.id)}">${L("ยืนยันให้", "Verify")}</button>`}${u.mfa && u.id !== me.id ? `<button class="btn" data-umfa="${esc(u.id)}" title="${L("ให้ผู้ใช้ตั้งค่าแอป Authenticator ใหม่ เช่น เมื่อทำมือถือหาย", "Make the user set up the authenticator app again, e.g. after losing their phone")}">${L("รีเซ็ต MFA", "Reset MFA")}</button>` : ""}</div>`
-    + (u.id === me.id ? "<span></span>" : `<button class="btn danger" data-udel="${esc(u.id)}">${L("ลบ", "Delete")}</button>`) + `</div>`).join("");
+    + `<div class="grp">${roleSel(u)}${u.verified ? "" : `<button class="btn" data-uverify="${esc(u.id)}">${L("ยืนยันให้", "Verify")}</button>`}${u.id !== me.id ? `<button class="btn" data-upw="${esc(u.id)}">${L("เปลี่ยนรหัสผ่าน", "Set password")}</button>` : ""}${u.mfa && u.id !== me.id ? `<button class="btn" data-umfa="${esc(u.id)}" title="${L("ให้ผู้ใช้ตั้งค่าแอป Authenticator ใหม่ เช่น เมื่อทำมือถือหาย", "Make the user set up the authenticator app again, e.g. after losing their phone")}">${L("รีเซ็ต MFA", "Reset MFA")}</button>` : ""}</div>`
+    + (u.id === me.id ? "<span></span>" : `<button class="btn danger" data-udel="${esc(u.id)}">${L("ลบ", "Delete")}</button>`)
+    + (u.id === me.id ? "" : `<form class="upw-form" data-upwform="${esc(u.id)}" hidden><div class="f"><label for="upw_${esc(u.id)}">${L(`รหัสผ่านใหม่ของ ${esc(u.name)} (อย่างน้อย 8 ตัว)`, `New password for ${esc(u.name)} (8+ characters)`)}</label><input id="upw_${esc(u.id)}" type="text" minlength="8" maxlength="200" autocomplete="new-password" spellcheck="false" required></div>`
+      + `<button class="btn" type="button" data-upwgen="${esc(u.id)}">${L("สุ่มรหัส", "Generate")}</button><button class="btn primary">${L("บันทึก", "Save")}</button><button class="btn" type="button" data-upwcancel>${L("ยกเลิก", "Cancel")}</button>`
+      + `<p class="upw-hint">${L("หลังบันทึก ผู้ใช้จะถูกออกจากระบบทุกเครื่อง และต้องเข้าสู่ระบบด้วยรหัสใหม่ กรุณาแจ้งรหัสให้ผู้ใช้ทางช่องทางที่ปลอดภัย และให้ผู้ใช้เปลี่ยนเองอีกครั้งหลังเข้าสู่ระบบ", "Saving signs the user out everywhere; they sign in with the new password. Share it over a safe channel and ask them to change it after signing in.")}</p></form>`) + `</div>`).join("");
   const s = cfg.smtp;
   const inp = (id, label, val, o = {}) => `<div class="f${o.full ? " full" : ""}"><label for="${id}">${label}</label><input id="${id}" type="${o.type || "text"}" value="${esc(val ?? "")}" placeholder="${esc(o.ph || "")}" autocomplete="off"${o.mono ? ' class="mono"' : ""}></div>`;
   box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(usersNote)}<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${roleHelp()}</p><div class="list">${rows}</div>`
@@ -3212,6 +3219,22 @@ $("#usersBody").addEventListener("change", async (e) => {
   openUsers();
 });
 $("#usersBody").addEventListener("click", async (e) => {
+  const pw = e.target.closest("[data-upw]");
+  if (pw) {
+    const f = $(`#usersBody [data-upwform="${pw.dataset.upw}"]`);
+    for (const x of document.querySelectorAll("#usersBody .upw-form")) if (x !== f) x.hidden = true;
+    f.hidden = !f.hidden; if (!f.hidden) f.querySelector("input").focus();
+    return;
+  }
+  if (e.target.closest("[data-upwcancel]")) { e.target.closest(".upw-form").hidden = true; return; }
+  const gen = e.target.closest("[data-upwgen]");
+  if (gen) {
+    // 14 characters without look-alikes (0/O, 1/l/I) so it can be read out or typed from a note
+    const abc = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", buf = new Uint32Array(14);
+    crypto.getRandomValues(buf);
+    const inp = $("#upw_" + gen.dataset.upwgen); inp.value = [...buf].map((x) => abc[x % abc.length]).join(""); inp.select();
+    return;
+  }
   const mr = e.target.closest("[data-umfa]");
   if (mr) {
     const u = mr.closest(".user-row")?.querySelector("b")?.textContent || "";
@@ -3245,6 +3268,12 @@ async function saveSmtp(quiet) {
 }
 $("#usersBody").addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (e.target.dataset.upwform) {
+    const f = e.target, name = f.closest(".user-row")?.querySelector("b")?.textContent || "";
+    if (await userCall("users/" + f.dataset.upwform, "PATCH", { password: f.querySelector("input").value }))
+      usersNote = { th: `ตั้งรหัสผ่านใหม่ให้ ${name} แล้ว ผู้ใช้ถูกออกจากระบบทุกเครื่อง`, en: `New password set for ${name}. They were signed out everywhere.`, kind: "ok" };
+    return openUsers();
+  }
   if (e.target.id === "mfaPolicy") {
     const roles = [...e.target.querySelectorAll("[data-mfarole]:checked")].map((x) => x.dataset.mfarole);
     if (await userCall("settings", "PUT", { mfaRoles: roles })) usersNote = { th: "บันทึกการตั้งค่า MFA แล้ว", en: "MFA setting saved", kind: "ok" };
@@ -3263,7 +3292,7 @@ const AUDIT_ACTIONS = {
   "account.password": ["เปลี่ยนรหัสผ่าน", "Changed password"],
   "account.mfa_on": ["เปิดใช้ MFA", "Turned on MFA"], "account.mfa_off": ["ปิด MFA", "Turned off MFA"], "account.mfa_recovery_new": ["สร้างรหัสสำรอง MFA ใหม่", "Made new MFA recovery codes"],
   "auth.mfa_failed": ["กรอกรหัส MFA ผิด", "Wrong MFA code"], "auth.mfa_recovery_used": ["เข้าสู่ระบบด้วยรหัสสำรอง MFA", "Signed in with an MFA recovery code"],
-  "admin.mfa_reset": ["รีเซ็ต MFA ให้ผู้ใช้", "Reset a user's MFA"],
+  "admin.mfa_reset": ["รีเซ็ต MFA ให้ผู้ใช้", "Reset a user's MFA"], "admin.password": ["ตั้งรหัสผ่านใหม่ให้ผู้ใช้", "Set a user's password"],
   "admin.role": ["เปลี่ยนสิทธิ์ผู้ใช้", "Changed a user's role"], "admin.verify": ["ยืนยันบัญชีให้ผู้ใช้", "Verified a user"],
   "admin.delete_user": ["ลบผู้ใช้", "Deleted a user"], "admin.settings": ["แก้การตั้งค่าระบบ", "Changed settings"],
   "diagram.create": ["สร้างผัง", "Created a diagram"], "diagram.edit": ["แก้ไขผัง", "Edited a diagram"], "diagram.delete": ["ลบผัง", "Deleted a diagram"],
@@ -3297,7 +3326,7 @@ function auditChange(c) {
 function auditSummary(e) {
   if (e.action === "admin.role") return `${e.target ? e.target.name + " (" + e.target.email + ")" : ""}: ${roleLabel(e.from)} → ${roleLabel(e.to)}`;
   if (e.action === "auth.mfa_recovery_used") return L(`เหลือรหัสสำรอง ${e.left} รหัส`, `${e.left} recovery codes left`);
-  if (e.action === "admin.verify" || e.action === "admin.delete_user" || e.action === "admin.mfa_reset") return e.target ? `${e.target.name} (${e.target.email})` : "";
+  if (e.action === "admin.verify" || e.action === "admin.delete_user" || e.action === "admin.mfa_reset" || e.action === "admin.password") return e.target ? `${e.target.name} (${e.target.email})` : "";
   if (e.action === "admin.settings") return (e.fields || []).map((f) => (f === "smtp" ? L("การส่งอีเมล", "e-mail sending") : f === "mfa" ? L("การบังคับใช้ MFA", "MFA requirement") : L("ที่อยู่เว็บ", "web address"))).join(", ");
   if (e.action === "auth.login_failed" || e.action === "auth.locked") return e.email || "";
   if (e.action === "account.register") return roleLabel(e.role);
