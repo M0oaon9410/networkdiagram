@@ -21,7 +21,7 @@ const tempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "netplan-test-"));
 async function startServer({ dataDir = tempDir(), env = {} } = {}) {
   const port = await freePort();
   const child = spawn(process.execPath, [path.join(ROOT, "server.js")], {
-    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, AUTH: "on", DEFAULT_ROLE: "", APP_URL: "", SMTP_HOST: "", ...env },
+    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, AUTH: "on", MFA_REQUIRED: "", DEFAULT_ROLE: "", APP_URL: "", SMTP_HOST: "", ...env },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";

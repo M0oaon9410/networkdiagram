@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test --test-concurrency=1 test/api.test.js test/audit.test.js"
+    "test": "node --test --test-concurrency=1 test/api.test.js test/audit.test.js test/mfa.test.js"
   },
   "engines": { "node": ">=22.5" },
   "license": "MIT"

@@ -245,6 +245,14 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .note { border-radius: 8px; padding: 9px 11px; font-size: 13.5px; line-height: 1.55; border: 1px solid var(--line); background: var(--panel-2); }
 .note.err { border-color: var(--danger); color: var(--danger); }
 .note.ok { border-color: #2f9e5a; }
+.mfa-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.55; }
+.mfa-qr { display: grid; justify-items: center; gap: 6px; }
+.mfa-qr img { width: 184px; height: 184px; border-radius: 8px; border: 1px solid var(--line); background: #fff; image-rendering: pixelated; }
+.mfa-secret { font-family: var(--font-mono); font-size: 13px; letter-spacing: .06em; word-break: break-all; text-align: center; user-select: all; }
+.mfa-codes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 8px; font-family: var(--font-mono); font-size: 14.5px; letter-spacing: .04em; user-select: all; }
+.code-input { font-family: var(--font-mono); font-size: 20px !important; letter-spacing: .25em; text-align: center; }
+.mfa-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); margin-left: 4px; }
+.mfa-tag.on { border-color: #2f9e5a; color: #2f9e5a; }
 .usermenu { position: relative; }
 .usermenu summary { list-style: none; }
 .usermenu summary::-webkit-details-marker { display: none; }
@@ -2924,6 +2932,12 @@ const AUTH_ERRORS = {
   self: ["ลบบัญชีของตัวเองไม่ได้", "You can't delete your own account."],
   bad_url: ["ที่อยู่เว็บต้องขึ้นต้นด้วย http:// หรือ https://", "The address must start with http:// or https://"],
   network: ["เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", "Can't reach the server."],
+  bad_code: ["รหัสไม่ถูกต้อง ลองใหม่ด้วยรหัสล่าสุดจากแอป (รหัสเปลี่ยนทุก 30 วินาที)", "That code is wrong. Try the newest code from the app (it changes every 30 seconds)."],
+  bad_ticket: ["หมดเวลากรอกรหัส กรุณาเข้าสู่ระบบใหม่", "Time ran out for the code. Please sign in again."],
+  mfa_expired: ["หมดเวลาตั้งค่า กรุณาเริ่มใหม่", "Setup timed out. Please start again."],
+  mfa_required: ["บัญชีสิทธิ์นี้ต้องใช้ MFA ปิดไม่ได้", "Your role requires MFA, so it can't be turned off."],
+  mfa_on: ["เปิดใช้ MFA อยู่แล้ว", "MFA is already on."],
+  mfa_off: ["ยังไม่ได้เปิดใช้ MFA", "MFA isn't on."],
 };
 const errNote = (code) => { const m = AUTH_ERRORS[code] || [`เกิดข้อผิดพลาด (${code})`, `Something went wrong (${code})`]; return { th: m[0], en: m[1], kind: "err" }; };
 const noteHtml = (n) => (n ? `<div class="note ${n.kind || ""}" role="status">${esc(L(n.th, n.en))}</div>` : "");
@@ -2936,6 +2950,14 @@ async function postJson(path, body) {
 }
 
 let authView = { view: "login", note: null, email: "", token: "" };
+async function startMfaSetup(voluntary) {
+  showAuth("mfasetup", null, { setup: null, voluntary });
+  const r = await postJson("me/mfa/setup", {});
+  showAuth("mfasetup", r.ok ? null : errNote(r.j.error), { setup: r.ok ? r.j : null, voluntary });
+}
+function recoveryText(codes) {
+  return `AON (Asset and Operational Network) — ${L("รหัสสำรอง MFA", "MFA recovery codes")}\n${me ? me.email : ""}\n${new Date().toLocaleString(L("th-TH", "en-GB"))}\n\n${codes.join("\n")}\n\n${L("แต่ละรหัสใช้ได้ครั้งเดียว", "Each code works once.")}\n`;
+}
 function showAuth(view, note, extra = {}) {
   authView = { ...authView, view, note: note || null, ...extra };
   $("#authScreen").hidden = false;
@@ -2964,6 +2986,28 @@ function renderAuth() {
     h += `<h1>${L("ตั้งรหัสผ่านใหม่", "Set a new password")}</h1>${noteHtml(note)}`;
     h += `<form data-form="reset">${f("a_pass", L("รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)", "New password (8+ characters)"), "password", "new-password")}${f("a_pass2", L("ยืนยันรหัสผ่านใหม่", "Confirm new password"), "password", "new-password")}<button class="btn primary">${L("บันทึกรหัสผ่าน", "Save password")}</button></form>`;
     h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="login">${L("กลับไปหน้าเข้าสู่ระบบ", "Back to sign in")}</button></div>`;
+  } else if (view === "mfa") {
+    h += `<h1>${L("ยืนยันตัวตนขั้นที่ 2", "Two-step verification")}</h1><p class="muted">${L("เปิดแอป Authenticator ในมือถือ แล้วกรอกรหัส 6 หลักของ AON", "Open the authenticator app on your phone and enter the 6-digit code for AON.")}</p>${noteHtml(note)}`;
+    h += `<form data-form="mfa"><div class="f"><label for="a_code">${L("รหัส 6 หลัก", "6-digit code")}</label><input id="a_code" class="code-input" autocomplete="one-time-code" maxlength="12" required spellcheck="false"></div><button class="btn primary">${L("ยืนยัน", "Verify")}</button></form>`;
+    h += `<p class="muted" style="margin:0;font-size:12.5px;line-height:1.6">${L("ทำมือถือหาย? กรอกรหัสสำรอง (แบบ xxxx-xxxx) ที่เก็บไว้ตอนตั้งค่าแทนได้ แต่ละรหัสใช้ได้ครั้งเดียว", "Lost your phone? Enter one of your recovery codes (xxxx-xxxx) instead. Each works once.")}</p>`;
+    h += `<div class="auth-links"><button class="linkbtn" type="button" data-go="login">${L("กลับไปหน้าเข้าสู่ระบบ", "Back to sign in")}</button></div>`;
+  } else if (view === "mfasetup") {
+    const st = authView.setup;
+    h += `<h1>${L("ตั้งค่าการยืนยันตัวตน 2 ขั้น (MFA)", "Set up two-step verification (MFA)")}</h1>`;
+    h += `<p class="muted" style="margin:0">${authView.voluntary ? L("หลังเปิดใช้ ทุกครั้งที่เข้าสู่ระบบต้องกรอกรหัสจากแอปในมือถือต่อจากรหัสผ่าน", "Once it's on, every sign-in asks for a code from your phone after the password.") : L(`บัญชี${esc(roleLabel(me?.role))}ต้องใช้ MFA ก่อนเข้าใช้งาน ทำครั้งเดียว ใช้เวลาประมาณ 1 นาที`, `${esc(roleLabel(me?.role))} accounts must use MFA. It's a one-time step and takes about a minute.`)}</p>${noteHtml(note)}`;
+    if (!st) h += `<p class="muted">${L("กำลังเตรียม…", "Preparing…")}</p>`;
+    else {
+      h += `<ol class="mfa-steps"><li>${L("ติดตั้งแอป <b>Google Authenticator</b> หรือ <b>Microsoft Authenticator</b> ในมือถือ", "Install <b>Google Authenticator</b> or <b>Microsoft Authenticator</b> on your phone.")}</li><li>${L("ในแอป กดเพิ่มบัญชี แล้วสแกน QR code นี้", "In the app, add an account and scan this QR code.")}</li><li>${L("กรอกรหัส 6 หลักที่แอปแสดง", "Enter the 6-digit code the app shows.")}</li></ol>`;
+      h += `<div class="mfa-qr"><img alt="${L("QR code สำหรับแอป Authenticator", "QR code for the authenticator app")}" src="data:image/svg+xml;base64,${btoa(st.qr)}"><small class="muted">${L("สแกนไม่ได้? พิมพ์รหัสนี้ในแอปแทน", "Can't scan? Type this key in the app:")}</small><div class="mfa-secret">${esc(st.secret.replace(/(.{4})/g, "$1 ").trim())}</div></div>`;
+      h += `<form data-form="mfaenable"><div class="f"><label for="a_code">${L("รหัส 6 หลักจากแอป", "6-digit code from the app")}</label><input id="a_code" class="code-input" autocomplete="one-time-code" inputmode="numeric" maxlength="6" required></div><button class="btn primary">${L("เปิดใช้ MFA", "Turn on MFA")}</button></form>`;
+    }
+    h += `<div class="auth-links">${authView.voluntary ? `<button class="linkbtn" type="button" data-go="reload">${L("ยกเลิก", "Cancel")}</button>` : ""}<button class="linkbtn" type="button" data-go="logout">${L("ออกจากระบบ", "Sign out")}</button></div>`;
+  } else if (view === "mfacodes") {
+    h += `<h1>${L("เก็บรหัสสำรองไว้", "Save your recovery codes")}</h1>${noteHtml(note)}`;
+    h += `<p class="muted" style="margin:0;line-height:1.6">${L("ใช้รหัสเหล่านี้เข้าสู่ระบบแทนรหัสจากแอปได้ ถ้ามือถือหายหรือเปลี่ยนเครื่อง แต่ละรหัสใช้ได้ครั้งเดียว <b>รหัสจะแสดงแค่ครั้งนี้</b> กรุณาดาวน์โหลดหรือจดเก็บไว้ในที่ปลอดภัย", "Use these instead of an app code if you lose or change your phone. Each works once. <b>They are shown only now</b>, so download or write them down somewhere safe.")}</p>`;
+    h += `<div class="mfa-codes">${authView.codes.map((c) => `<span>${esc(c)}</span>`).join("")}</div>`;
+    h += `<div class="grp"><button class="btn" type="button" data-go="dlcodes">${L("ดาวน์โหลดเป็นไฟล์", "Download as a file")}</button><button class="btn" type="button" data-go="copycodes">${L("คัดลอก", "Copy")}</button></div>`;
+    h += `<label class="check"><input type="checkbox" id="a_saved"> ${L("ฉันเก็บรหัสสำรองไว้แล้ว", "I've saved the recovery codes")}</label><button class="btn primary" type="button" data-go="reload" id="a_done" disabled>${L("เข้าใช้งาน", "Continue")}</button>`;
   } else if (view === "pending") {
     h += `<h1>${L("รอผู้ดูแลระบบอนุมัติ", "Waiting for approval")}</h1><p>${L(`บัญชี ${esc(me ? me.email : "")} ยืนยันอีเมลแล้ว แต่ผู้ดูแลระบบยังไม่ได้กำหนดสิทธิ์ให้ กรุณาแจ้งผู้ดูแลระบบ แล้วกลับมาโหลดหน้านี้ใหม่`, `${esc(me ? me.email : "")} is verified, but an admin hasn't given it access yet. Please ask an admin, then reload this page.`)}</p>`;
     h += `<button class="btn primary" type="button" data-go="reload">${L("โหลดใหม่", "Reload")}</button><div class="auth-links"><button class="linkbtn" type="button" data-go="logout">${L("ออกจากระบบ", "Sign out")}</button></div>`;
@@ -2971,6 +3015,7 @@ function renderAuth() {
     h += `<h1>${L("ตรวจสอบอีเมลของคุณ", "Check your e-mail")}</h1>${noteHtml(note)}<button class="btn primary" type="button" data-go="login">${L("ไปหน้าเข้าสู่ระบบ", "Go to sign in")}</button>`;
   }
   $("#authCard").innerHTML = h;
+  $("#a_saved")?.addEventListener("change", (e) => { $("#a_done").disabled = !e.target.checked; });
   const first = $("#authCard input");
   if (first && !first.value) first.focus(); else if (first) $("#authCard input[type=password]")?.focus();
 }
@@ -2979,7 +3024,9 @@ $("#authCard").addEventListener("click", async (e) => {
   if (lb) { setLang(lb.dataset.alang); return; }
   const g = e.target.closest("[data-go]"); if (!g) return;
   const email = $("#a_email")?.value.trim() || authView.email;
-  if (g.dataset.go === "reload") { location.reload(); return; }
+  if (g.dataset.go === "reload") { location.replace(location.pathname + location.hash); return; }
+  if (g.dataset.go === "dlcodes") { saveFile("AON-recovery-codes.txt", recoveryText(authView.codes), "text/plain;charset=utf-8"); return; }
+  if (g.dataset.go === "copycodes") { try { await navigator.clipboard.writeText(recoveryText(authView.codes)); toast(L("คัดลอกแล้ว", "Copied")); } catch (err) { toast(L("คัดลอกไม่ได้ กรุณาจดเอง", "Couldn't copy. Please write them down.")); } return; }
   if (g.dataset.go === "logout") { await postJson("auth/logout", {}); try { localStorage.removeItem(LS_KEY); } catch (err) {} location.replace(location.pathname); return; }
   if (g.dataset.go === "resend") {
     const r = await postJson("auth/resend", { email });
@@ -2997,9 +3044,22 @@ $("#authCard").addEventListener("submit", async (e) => {
     if ((kind === "register" || kind === "reset") && v("a_pass") !== v("a_pass2")) return showAuth(kind, errNote("mismatch"), { email });
     if (kind === "login") {
       const r = await postJson("auth/login", { email, password: v("a_pass") });
+      if (r.ok && r.j.mfa) return showAuth("mfa", null, { email, ticket: r.j.ticket });
       if (r.ok) { location.replace(location.pathname); return; }
       const n = errNote(r.j.error); if (r.j.error === "unverified") n.resend = true;
       return showAuth("login", n, { email });
+    }
+    if (kind === "mfa") {
+      const r = await postJson("auth/mfa", { ticket: authView.ticket, code: v("a_code").trim() });
+      if (r.ok) { location.replace(location.pathname); return; }
+      if (r.j.error === "bad_ticket" || r.j.error === "too_many") return showAuth("login", errNote(r.j.error), { email: authView.email });
+      return showAuth("mfa", errNote(r.j.error));
+    }
+    if (kind === "mfaenable") {
+      const r = await postJson("me/mfa/enable", { code: v("a_code").trim() });
+      if (r.ok) return showAuth("mfacodes", { th: "เปิดใช้ MFA แล้ว", en: "MFA is on.", kind: "ok" }, { codes: r.j.recovery });
+      if (r.j.error === "mfa_expired") return startMfaSetup(authView.voluntary);
+      return showAuth("mfasetup", errNote(r.j.error));
     }
     if (kind === "register") {
       const r = await postJson("auth/register", { name: v("a_name").trim(), email, password: v("a_pass") });
@@ -3034,7 +3094,7 @@ function renderUserMenu() {
   $("#userName").textContent = me.name || me.email;
   $("#userMenuBody").innerHTML = `<div class="who"><b>${esc(me.name)}</b><small>${esc(me.email)}</small><span class="role ${me.role}">${esc(roleLabel(me.role))}</span></div>`
     + (me.role === "admin" ? `<button class="btn" data-um="users">${L("จัดการผู้ใช้และอีเมล", "Users & e-mail settings")}</button><button class="btn" data-um="audit">${L("บันทึกการใช้งาน", "Activity log")}</button>` : "")
-    + `<button class="btn" data-um="password">${L("เปลี่ยนรหัสผ่าน", "Change password")}</button><button class="btn" data-um="logout">${L("ออกจากระบบ", "Sign out")}</button>`;
+    + `<button class="btn" data-um="password">${L("เปลี่ยนรหัสผ่าน", "Change password")}</button><button class="btn" data-um="mfa">${L("การยืนยันตัวตน 2 ขั้น (MFA)", "Two-step verification (MFA)")}<span class="mfa-tag${me.mfa ? " on" : ""}">${me.mfa ? L("เปิด", "on") : L("ปิด", "off")}</span></button><button class="btn" data-um="logout">${L("ออกจากระบบ", "Sign out")}</button>`;
 }
 function applyRole() {
   canEdit = !me || me.role === "admin" || me.role === "editor";
@@ -3053,6 +3113,7 @@ $("#userMenuBody").addEventListener("click", async (e) => {
     location.replace(location.pathname); return;
   }
   if (b.dataset.um === "password") return openPassword();
+  if (b.dataset.um === "mfa") return me.mfa ? openMfa() : startMfaSetup(true);
   if (b.dataset.um === "users") return openUsers();
   if (b.dataset.um === "audit") return openAudit();
 });
@@ -3071,6 +3132,38 @@ $("#pwBody").addEventListener("submit", async (e) => {
   closeModals(); toast(L("เปลี่ยนรหัสผ่านแล้ว", "Password changed"));
 });
 
+// MFA is on: make new recovery codes, or turn it off when the role doesn't require it
+function openMfa(note, codes) {
+  const required = !!me.mfaRequired;
+  let h = `<h2 id="pwTitle">${L("การยืนยันตัวตน 2 ขั้น (MFA)", "Two-step verification (MFA)")}</h2>${noteHtml(note)}`;
+  if (codes) {
+    h += `<p class="muted" style="margin:0;line-height:1.6">${L("รหัสสำรองชุดใหม่ (ชุดเดิมใช้ไม่ได้แล้ว) รหัสจะแสดงแค่ครั้งนี้", "Your new recovery codes (the old ones no longer work). They are shown only now.")}</p><div class="mfa-codes">${codes.map((c) => `<span>${esc(c)}</span>`).join("")}</div>`;
+    h += `<div class="actions" style="margin:0"><button class="btn" type="button" id="mfaDl">${L("ดาวน์โหลดเป็นไฟล์", "Download as a file")}</button><div class="spacer"></div><button class="btn" type="button" data-close>${L("ปิด", "Close")}</button></div>`;
+    $("#pwBody").innerHTML = h; openModal("#pwModal");
+    $("#mfaDl").onclick = () => saveFile("AON-recovery-codes.txt", recoveryText(codes), "text/plain;charset=utf-8");
+    return;
+  }
+  h += `<p style="margin:0">${L("สถานะ: <b>เปิดใช้อยู่</b> ทุกครั้งที่เข้าสู่ระบบต้องกรอกรหัสจากแอป Authenticator", "Status: <b>on</b>. Every sign-in asks for a code from the authenticator app.")}</p>`;
+  h += `<form id="mfaRecForm" style="display:grid;gap:10px"><div class="sec" style="margin:4px 0 0">${L("สร้างรหัสสำรองชุดใหม่", "New recovery codes")}</div><div class="f"><label for="mfa_code1">${L("รหัส 6 หลักจากแอป", "6-digit code from the app")}</label><input id="mfa_code1" class="code-input" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></div><div class="actions" style="margin:0"><button class="btn">${L("สร้างรหัสสำรองใหม่", "Make new codes")}</button></div></form>`;
+  if (!required) h += `<form id="mfaOffForm" style="display:grid;gap:10px"><div class="sec" style="margin:4px 0 0">${L("ปิด MFA", "Turn off MFA")}</div><div class="f"><label for="mfa_pw">${L("รหัสผ่าน", "Password")}</label><input id="mfa_pw" type="password" autocomplete="current-password" required></div><div class="f"><label for="mfa_code2">${L("รหัส 6 หลักจากแอป หรือรหัสสำรอง", "App code or a recovery code")}</label><input id="mfa_code2" class="code-input" maxlength="12" autocomplete="one-time-code" required></div><div class="actions" style="margin:0"><button class="btn danger">${L("ปิด MFA", "Turn off MFA")}</button></div></form>`;
+  else h += `<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${L("สิทธิ์ของบัญชีนี้ต้องใช้ MFA จึงปิดไม่ได้ ถ้าเปลี่ยนมือถือ ให้ใช้รหัสสำรองเข้าสู่ระบบ แล้วขอให้ผู้ดูแลระบบอีกคนรีเซ็ต MFA ให้", "Your role requires MFA, so it can't be turned off. If you change phones, sign in with a recovery code and ask another admin to reset your MFA.")}</p>`;
+  h += `<div class="actions" style="margin:0"><div class="spacer"></div><button class="btn" type="button" data-close>${L("ปิด", "Close")}</button></div>`;
+  $("#pwBody").innerHTML = h; openModal("#pwModal");
+}
+$("#pwBody").addEventListener("submit", async (e) => {
+  if (e.target.id === "mfaRecForm") {
+    e.preventDefault(); e.stopImmediatePropagation();
+    const r = await postJson("me/mfa/recovery", { code: $("#mfa_code1").value.trim() });
+    return r.ok ? openMfa({ th: "สร้างรหัสสำรองใหม่แล้ว", en: "New recovery codes made.", kind: "ok" }, r.j.recovery) : openMfa(errNote(r.j.error));
+  }
+  if (e.target.id === "mfaOffForm") {
+    e.preventDefault(); e.stopImmediatePropagation();
+    const r = await postJson("me/mfa/disable", { password: $("#mfa_pw").value, code: $("#mfa_code2").value.trim() });
+    if (!r.ok) return openMfa(errNote(r.j.error));
+    me.mfa = false; renderUserMenu(); closeModals(); toast(L("ปิด MFA แล้ว", "MFA turned off"));
+  }
+}, true);
+
 let usersNote = null;
 async function openUsers() {
   openModal("#usersModal");
@@ -3083,12 +3176,16 @@ async function openUsers() {
     list = await a.json(); cfg = await b.json();
   } catch (err) { box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(errNote("network"))}<div class="actions"><div class="spacer"></div><button class="btn" data-close>${L("ปิด", "Close")}</button></div>`; return; }
   const roleSel = (u) => `<select class="sel-sm" data-urole="${esc(u.id)}" aria-label="${L("สิทธิ์ของ", "Role of")} ${esc(u.name)}">${["admin", "editor", "viewer", "pending"].map((r) => `<option value="${r}"${u.role === r ? " selected" : ""}>${esc(roleLabel(r))}</option>`).join("")}</select>`;
-  const rows = list.map((u) => `<div class="user-row"><div><b>${esc(u.name)}${u.id === me.id ? L(" (คุณ)", " (you)") : ""}</b><small>${esc(u.email)} · ${u.verified ? L("ยืนยันอีเมลแล้ว", "verified") : L("รอยืนยันอีเมล", "waiting for e-mail verification")}${u.lastLogin ? " · " + L("เข้าล่าสุด ", "last sign-in ") + esc(new Date(u.lastLogin).toLocaleString(L("th-TH", "en-GB"))) : ""}</small></div>`
-    + `<div class="grp">${roleSel(u)}${u.verified ? "" : `<button class="btn" data-uverify="${esc(u.id)}">${L("ยืนยันให้", "Verify")}</button>`}</div>`
+  const rows = list.map((u) => `<div class="user-row"><div><b>${esc(u.name)}${u.id === me.id ? L(" (คุณ)", " (you)") : ""}</b><small>${esc(u.email)} · ${u.verified ? L("ยืนยันอีเมลแล้ว", "verified") : L("รอยืนยันอีเมล", "waiting for e-mail verification")} · MFA ${u.mfa ? L("เปิด", "on") : u.mfaSetupRequired ? L("ยังไม่ตั้งค่า (บังคับ)", "not set up (required)") : L("ปิด", "off")}${u.lastLogin ? " · " + L("เข้าล่าสุด ", "last sign-in ") + esc(new Date(u.lastLogin).toLocaleString(L("th-TH", "en-GB"))) : ""}</small></div>`
+    + `<div class="grp">${roleSel(u)}${u.verified ? "" : `<button class="btn" data-uverify="${esc(u.id)}">${L("ยืนยันให้", "Verify")}</button>`}${u.mfa && u.id !== me.id ? `<button class="btn" data-umfa="${esc(u.id)}" title="${L("ให้ผู้ใช้ตั้งค่าแอป Authenticator ใหม่ เช่น เมื่อทำมือถือหาย", "Make the user set up the authenticator app again, e.g. after losing their phone")}">${L("รีเซ็ต MFA", "Reset MFA")}</button>` : ""}</div>`
     + (u.id === me.id ? "<span></span>" : `<button class="btn danger" data-udel="${esc(u.id)}">${L("ลบ", "Delete")}</button>`) + `</div>`).join("");
   const s = cfg.smtp;
   const inp = (id, label, val, o = {}) => `<div class="f${o.full ? " full" : ""}"><label for="${id}">${label}</label><input id="${id}" type="${o.type || "text"}" value="${esc(val ?? "")}" placeholder="${esc(o.ph || "")}" autocomplete="off"${o.mono ? ' class="mono"' : ""}></div>`;
   box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(usersNote)}<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${roleHelp()}</p><div class="list">${rows}</div>`
+    + `<div class="sec">${L("การยืนยันตัวตน 2 ขั้น (MFA)", "Two-step verification (MFA)")}</div>`
+    + `<form id="mfaPolicy"><p class="muted" style="margin:0 0 8px;font-size:13px;line-height:1.6">${L("บังคับให้ผู้ใช้สิทธิ์เหล่านี้ใช้รหัสจากแอป Authenticator ทุกครั้งที่เข้าสู่ระบบ ผู้ที่ยังไม่ได้ตั้งค่าจะต้องตั้งค่าก่อนใช้งาน", "Require these roles to enter a code from an authenticator app at every sign-in. Anyone not set up yet must do it first.")}</p><div class="grp" style="flex-wrap:wrap;gap:14px">`
+    + ["admin", "editor", "viewer"].map((r) => `<label class="check"><input type="checkbox" data-mfarole="${r}"${(cfg.mfaRoles || []).includes(r) ? " checked" : ""}> ${esc(roleLabel(r))}</label>`).join("")
+    + `</div><div class="actions"><button class="btn">${L("บันทึกการตั้งค่า MFA", "Save MFA setting")}</button></div></form>`
     + `<div class="sec">${L("การส่งอีเมล (SMTP)", "E-mail sending (SMTP)")}</div>`
     + `<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${cfg.mailReady ? L("ตั้งค่าแล้ว ระบบจะส่งลิงก์ยืนยันและลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล", "Set up. Verification and password links are sent by e-mail.") : L("ยังไม่ได้ตั้งค่า ระหว่างนี้ลิงก์ยืนยันจะแสดงใน log ของเซิร์ฟเวอร์ (docker compose logs) หรือกด “ยืนยันให้” ที่รายชื่อด้านบน", "Not set up. Until then, links appear in the server log (docker compose logs), or press “Verify” in the list above.")}</p>`
     + `<form id="smtpForm"><div class="fields">${inp("s_host", L("เซิร์ฟเวอร์ SMTP", "SMTP server"), s.host, { ph: "smtp.gmail.com" })}${inp("s_port", L("พอร์ต", "Port"), s.port, { ph: "587", type: "number" })}`
@@ -3115,6 +3212,13 @@ $("#usersBody").addEventListener("change", async (e) => {
   openUsers();
 });
 $("#usersBody").addEventListener("click", async (e) => {
+  const mr = e.target.closest("[data-umfa]");
+  if (mr) {
+    const u = mr.closest(".user-row")?.querySelector("b")?.textContent || "";
+    if (!confirm(L(`รีเซ็ต MFA ของ ${u}? ผู้ใช้จะต้องตั้งค่าแอป Authenticator ใหม่ในการเข้าสู่ระบบครั้งถัดไป`, `Reset MFA for ${u}? They'll have to set up the authenticator app again at their next sign-in.`))) return;
+    if (await userCall("users/" + mr.dataset.umfa, "PATCH", { resetMfa: true })) usersNote = { th: "รีเซ็ต MFA แล้ว", en: "MFA reset", kind: "ok" };
+    openUsers(); return;
+  }
   const v = e.target.closest("[data-uverify]"), d = e.target.closest("[data-udel]");
   if (v) { if (await userCall("users/" + v.dataset.uverify, "PATCH", { verified: true })) usersNote = { th: "ยืนยันบัญชีแล้ว", en: "Account verified", kind: "ok" }; openUsers(); return; }
   if (d) {
@@ -3139,7 +3243,16 @@ async function saveSmtp(quiet) {
   if (ok && !quiet) usersNote = { th: "บันทึกการตั้งค่าแล้ว", en: "Settings saved", kind: "ok" };
   return ok;
 }
-$("#usersBody").addEventListener("submit", async (e) => { e.preventDefault(); await saveSmtp(false); openUsers(); });
+$("#usersBody").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (e.target.id === "mfaPolicy") {
+    const roles = [...e.target.querySelectorAll("[data-mfarole]:checked")].map((x) => x.dataset.mfarole);
+    if (await userCall("settings", "PUT", { mfaRoles: roles })) usersNote = { th: "บันทึกการตั้งค่า MFA แล้ว", en: "MFA setting saved", kind: "ok" };
+    try { const r = await apiFetch("me"); if (r.ok) { me = await r.json(); if (me.mfaSetupRequired) { closeModals(); return startMfaSetup(false); } } } catch (err) {}
+    return openUsers();
+  }
+  await saveSmtp(false); openUsers();
+});
 
 /* ---------- Audit log (admin) ---------- */
 const AUDIT_ACTIONS = {
@@ -3148,6 +3261,9 @@ const AUDIT_ACTIONS = {
   "account.register": ["สมัครสมาชิก", "Signed up"], "account.verify": ["ยืนยันอีเมล", "Verified e-mail"],
   "account.reset_request": ["ขอลิงก์ตั้งรหัสผ่านใหม่", "Asked for a password reset"], "account.reset": ["ตั้งรหัสผ่านใหม่", "Reset password"],
   "account.password": ["เปลี่ยนรหัสผ่าน", "Changed password"],
+  "account.mfa_on": ["เปิดใช้ MFA", "Turned on MFA"], "account.mfa_off": ["ปิด MFA", "Turned off MFA"], "account.mfa_recovery_new": ["สร้างรหัสสำรอง MFA ใหม่", "Made new MFA recovery codes"],
+  "auth.mfa_failed": ["กรอกรหัส MFA ผิด", "Wrong MFA code"], "auth.mfa_recovery_used": ["เข้าสู่ระบบด้วยรหัสสำรอง MFA", "Signed in with an MFA recovery code"],
+  "admin.mfa_reset": ["รีเซ็ต MFA ให้ผู้ใช้", "Reset a user's MFA"],
   "admin.role": ["เปลี่ยนสิทธิ์ผู้ใช้", "Changed a user's role"], "admin.verify": ["ยืนยันบัญชีให้ผู้ใช้", "Verified a user"],
   "admin.delete_user": ["ลบผู้ใช้", "Deleted a user"], "admin.settings": ["แก้การตั้งค่าระบบ", "Changed settings"],
   "diagram.create": ["สร้างผัง", "Created a diagram"], "diagram.edit": ["แก้ไขผัง", "Edited a diagram"], "diagram.delete": ["ลบผัง", "Deleted a diagram"],
@@ -3180,8 +3296,9 @@ function auditChange(c) {
 }
 function auditSummary(e) {
   if (e.action === "admin.role") return `${e.target ? e.target.name + " (" + e.target.email + ")" : ""}: ${roleLabel(e.from)} → ${roleLabel(e.to)}`;
-  if (e.action === "admin.verify" || e.action === "admin.delete_user") return e.target ? `${e.target.name} (${e.target.email})` : "";
-  if (e.action === "admin.settings") return (e.fields || []).map((f) => (f === "smtp" ? L("การส่งอีเมล", "e-mail sending") : L("ที่อยู่เว็บ", "web address"))).join(", ");
+  if (e.action === "auth.mfa_recovery_used") return L(`เหลือรหัสสำรอง ${e.left} รหัส`, `${e.left} recovery codes left`);
+  if (e.action === "admin.verify" || e.action === "admin.delete_user" || e.action === "admin.mfa_reset") return e.target ? `${e.target.name} (${e.target.email})` : "";
+  if (e.action === "admin.settings") return (e.fields || []).map((f) => (f === "smtp" ? L("การส่งอีเมล", "e-mail sending") : f === "mfa" ? L("การบังคับใช้ MFA", "MFA requirement") : L("ที่อยู่เว็บ", "web address"))).join(", ");
   if (e.action === "auth.login_failed" || e.action === "auth.locked") return e.email || "";
   if (e.action === "account.register") return roleLabel(e.role);
   if (e.diagram) return `“${e.diagram.title}”` + (e.count ? ` · ${L("อุปกรณ์", "devices")} ${e.count.nodes} · ${L("สาย", "links")} ${e.count.links} · ${L("โซน", "zones")} ${e.count.zones}` : "");
@@ -3228,7 +3345,7 @@ async function loadAudit() {
   const when = (t) => new Date(t).toLocaleString(L("th-TH", "en-GB"), { dateStyle: "medium", timeStyle: "medium" });
   list.innerHTML = `<p class="muted" style="margin:0 0 6px;font-size:12.5px">${L(`แสดง ${auditRows.length} รายการล่าสุด`, `Showing the latest ${auditRows.length}`)}</p>` + auditRows.map((e) => {
     const act = AUDIT_ACTIONS[e.action] ? L(...AUDIT_ACTIONS[e.action]) : e.action;
-    const bad = e.action === "auth.login_failed" || e.action === "auth.locked" || e.action.endsWith("delete") || e.action === "admin.delete_user";
+    const bad = e.action === "auth.login_failed" || e.action === "auth.locked" || e.action === "auth.mfa_failed" || e.action.endsWith("delete") || e.action === "admin.delete_user";
     const ch = (e.changes || []).map(auditChange);
     const first = ch.slice(0, 6), rest = ch.slice(6);
     let det = first.length ? `<ul>${first.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
@@ -3278,6 +3395,7 @@ function boot() {
         return showAuth("login", vNote);
       }
       me = await r.json();
+      if (me.mfaSetupRequired) return startMfaSetup(false);
       if (me.role === "pending") return showAuth("pending");
       applyRole();
       if (vNote) toast(L(vNote.th, vNote.en));

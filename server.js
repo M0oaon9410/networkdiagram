@@ -6,7 +6,13 @@ const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
 const crypto = require("crypto");
-const { createAuth } = require("./lib/auth");
+const { createAuth, resetMfaCli } = require("./lib/auth");
+if (process.argv[2] === "reset-mfa") {
+  const dir = require("path").resolve(process.env.DATA_DIR || require("path").join(__dirname, "data"));
+  const ok = resetMfaCli(dir, process.argv[3]);
+  console.log(ok ? `MFA turned off for ${process.argv[3]}. Restart the server (docker compose restart) so it takes effect.` : `No account with e-mail ${process.argv[3]}`);
+  process.exit(ok ? 0 : 1);
+}
 const { createAudit } = require("./lib/audit");
 const { createLive, CLIENT_RE, SEL_RE } = require("./lib/live");
 
@@ -122,6 +128,7 @@ async function api(req, res, parts) {
       switch (parts[2]) {
         case "register": return reply(await auth.register(req, b));
         case "login": return reply(await auth.login(req, res, b));
+        case "mfa": return reply(await auth.loginMfa(req, res, b));
         case "logout": return reply(auth.logout(req, res));
         case "resend": return reply(await auth.resend(req, b));
         case "forgot": return reply(await auth.forgot(req, b));
@@ -134,8 +141,19 @@ async function api(req, res, parts) {
     if (parts[1] === "me") {
       if (parts.length === 2 && req.method === "GET") return send(res, 200, auth.publicUser(me));
       if (parts[2] === "password" && req.method === "POST") return reply(await auth.changePassword(req, me, await readJson(req)));
+      if (parts[2] === "mfa" && parts.length === 4 && req.method === "POST") {
+        const b = await readJson(req);
+        switch (parts[3]) {
+          case "setup": return reply(await auth.mfaSetup(req, me));
+          case "enable": return reply(await auth.mfaEnable(req, me, b));
+          case "recovery": return reply(await auth.mfaRecovery(req, me, b));
+          case "disable": return reply(await auth.mfaDisable(req, me, b));
+        }
+      }
       return send(res, 404, { error: "not found" });
     }
+    // a role that must use MFA can do nothing else until the authenticator app is set up
+    if (auth.mfaSetupNeeded(me)) return send(res, 403, { error: "mfa_setup_required" });
     if (parts[1] === "audit" && parts.length === 2 && req.method === "GET") {
       if (me.role !== "admin") return send(res, 403, { error: "admin_only" });
       const q = new URL(req.url, "http://x").searchParams;
