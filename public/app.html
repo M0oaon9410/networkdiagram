@@ -255,6 +255,7 @@ body { --pal-w: 216px; --insp-w: 320px; }
 .mfa-secret { font-family: var(--font-mono); font-size: 13px; letter-spacing: .06em; word-break: break-all; text-align: center; user-select: all; }
 .mfa-codes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 8px; font-family: var(--font-mono); font-size: 14.5px; letter-spacing: .04em; user-select: all; }
 .code-input { font-family: var(--font-mono); font-size: 20px !important; letter-spacing: .25em; text-align: center; }
+.new-user { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
 .upw-form { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px; align-items: end; padding-top: 8px; border-top: 1px dashed var(--line); }
 .upw-form input { font-family: var(--font-mono); }
 .upw-form .upw-hint { grid-column: 1 / -1; margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
@@ -2995,6 +2996,8 @@ const AUTH_ERRORS = {
   bad_login: ["อีเมลหรือรหัสผ่านไม่ถูกต้อง", "Wrong e-mail or password."],
   unverified: ["บัญชีนี้ยังไม่ได้ยืนยันอีเมล กรุณากดลิงก์ในอีเมลที่ส่งไปก่อน", "This account's e-mail is not verified yet. Please click the link we sent."],
   too_many: ["ลองผิดหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่", "Too many attempts. Please wait 15 minutes."],
+  email_taken: ["อีเมลนี้มีบัญชีอยู่แล้ว", "That e-mail already has an account."],
+  bad_role: ["กรุณาเลือกสิทธิ์", "Please pick a role."],
   exists: ["อีเมลนี้มีบัญชีอยู่แล้ว ลองเข้าสู่ระบบ หรือกดลืมรหัสผ่าน", "This e-mail already has an account. Sign in or reset the password."],
   bad_email: ["รูปแบบอีเมลไม่ถูกต้อง", "That e-mail address doesn't look right."],
   bad_name: ["กรุณากรอกชื่อ", "Please enter your name."],
@@ -3238,6 +3241,12 @@ $("#pwBody").addEventListener("submit", async (e) => {
   }
 }, true);
 
+// 14 characters without look-alikes (0/O, 1/l/I) so it can be read out or typed from a note
+function genPassword() {
+  const abc = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", buf = new Uint32Array(14);
+  crypto.getRandomValues(buf);
+  return [...buf].map((x) => abc[x % abc.length]).join("");
+}
 let usersNote = null;
 async function openUsers() {
   openModal("#usersModal");
@@ -3258,7 +3267,16 @@ async function openUsers() {
       + `<p class="upw-hint">${L("หลังบันทึก ผู้ใช้จะถูกออกจากระบบทุกเครื่อง และต้องเข้าสู่ระบบด้วยรหัสใหม่ กรุณาแจ้งรหัสให้ผู้ใช้ทางช่องทางที่ปลอดภัย และให้ผู้ใช้เปลี่ยนเองอีกครั้งหลังเข้าสู่ระบบ", "Saving signs the user out everywhere; they sign in with the new password. Share it over a safe channel and ask them to change it after signing in.")}</p></form>`) + `</div>`).join("");
   const s = cfg.smtp;
   const inp = (id, label, val, o = {}) => `<div class="f${o.full ? " full" : ""}"><label for="${id}">${label}</label><input id="${id}" type="${o.type || "text"}" value="${esc(val ?? "")}" placeholder="${esc(o.ph || "")}" autocomplete="off"${o.mono ? ' class="mono"' : ""}></div>`;
-  box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(usersNote)}<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${roleHelp()}</p><div class="list">${rows}</div>`
+  box.innerHTML = `<h2 id="usersTitle">${L("จัดการผู้ใช้", "Users")}</h2>${noteHtml(usersNote)}<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${roleHelp()}</p>`
+    + `<div><button class="btn primary" type="button" id="newUserBtn">+ ${L("สร้างผู้ใช้", "Create user")}</button></div>`
+    + `<form id="newUserForm" class="new-user" hidden><div class="fields">`
+    + `<div class="f"><label for="nu_name">${L("ชื่อ-นามสกุล", "Full name")}</label><input id="nu_name" maxlength="80" autocomplete="off" required></div>`
+    + `<div class="f"><label for="nu_email">${L("อีเมล", "E-mail")}</label><input id="nu_email" type="email" maxlength="200" autocomplete="off" required></div>`
+    + `<div class="f"><label for="nu_role">${L("สิทธิ์", "Role")}</label><select id="nu_role">${["viewer", "editor", "admin", "pending"].map((r) => `<option value="${r}">${esc(roleLabel(r))}</option>`).join("")}</select></div>`
+    + `<div class="f"><label for="nu_pass">${L("รหัสผ่านเริ่มต้น (อย่างน้อย 8 ตัว)", "Starting password (8+ characters)")}</label><div class="grp"><input id="nu_pass" class="mono" minlength="8" maxlength="200" autocomplete="new-password" spellcheck="false" required style="flex:1;min-width:0"><button class="btn" type="button" id="nuGen">${L("สุ่มรหัส", "Generate")}</button></div></div>`
+    + `</div><p class="muted" style="margin:6px 0;font-size:12.5px;line-height:1.5">${L("บัญชีใช้งานได้ทันทีโดยไม่ต้องยืนยันอีเมล กรุณาแจ้งอีเมลและรหัสผ่านให้ผู้ใช้ทางช่องทางที่ปลอดภัย และให้ผู้ใช้เปลี่ยนรหัสผ่านเองหลังเข้าสู่ระบบครั้งแรก", "The account works right away, with no verification e-mail. Share the e-mail and password over a safe channel and ask the user to change the password after first sign-in.")}</p>`
+    + `<div class="actions" style="margin:0"><button class="btn primary">${L("สร้างผู้ใช้", "Create user")}</button><button class="btn" type="button" id="nuCancel">${L("ยกเลิก", "Cancel")}</button></div></form>`
+    + `<div class="list">${rows}</div>`
     + `<div class="sec">${L("การยืนยันตัวตน 2 ขั้น (MFA)", "Two-step verification (MFA)")}</div>`
     + `<form id="mfaPolicy"><p class="muted" style="margin:0 0 8px;font-size:13px;line-height:1.6">${L("บังคับให้ผู้ใช้สิทธิ์เหล่านี้ใช้รหัสจากแอป Authenticator ทุกครั้งที่เข้าสู่ระบบ ผู้ที่ยังไม่ได้ตั้งค่าจะต้องตั้งค่าก่อนใช้งาน", "Require these roles to enter a code from an authenticator app at every sign-in. Anyone not set up yet must do it first.")}</p><div class="grp" style="flex-wrap:wrap;gap:14px">`
     + ["admin", "editor", "viewer"].map((r) => `<label class="check"><input type="checkbox" data-mfarole="${r}"${(cfg.mfaRoles || []).includes(r) ? " checked" : ""}> ${esc(roleLabel(r))}</label>`).join("")
@@ -3298,13 +3316,10 @@ $("#usersBody").addEventListener("click", async (e) => {
   }
   if (e.target.closest("[data-upwcancel]")) { e.target.closest(".upw-form").hidden = true; return; }
   const gen = e.target.closest("[data-upwgen]");
-  if (gen) {
-    // 14 characters without look-alikes (0/O, 1/l/I) so it can be read out or typed from a note
-    const abc = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", buf = new Uint32Array(14);
-    crypto.getRandomValues(buf);
-    const inp = $("#upw_" + gen.dataset.upwgen); inp.value = [...buf].map((x) => abc[x % abc.length]).join(""); inp.select();
-    return;
-  }
+  if (gen) { const inp = $("#upw_" + gen.dataset.upwgen); inp.value = genPassword(); inp.select(); return; }
+  if (e.target.id === "newUserBtn") { const f = $("#newUserForm"); f.hidden = !f.hidden; if (!f.hidden) $("#nu_name").focus(); return; }
+  if (e.target.id === "nuCancel") { $("#newUserForm").hidden = true; return; }
+  if (e.target.id === "nuGen") { $("#nu_pass").value = genPassword(); $("#nu_pass").select(); return; }
   const mr = e.target.closest("[data-umfa]");
   if (mr) {
     const u = mr.closest(".user-row")?.querySelector("b")?.textContent || "";
@@ -3338,6 +3353,19 @@ async function saveSmtp(quiet) {
 }
 $("#usersBody").addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (e.target.id === "newUserForm") {
+    const vals = { name: $("#nu_name").value.trim(), email: $("#nu_email").value.trim(), role: $("#nu_role").value, password: $("#nu_pass").value };
+    const r = await postJson("users", vals);
+    if (!r.ok) {
+      // keep what was typed so the admin only fixes the field that was wrong
+      usersNote = errNote(r.j.error); await openUsers();
+      $("#newUserForm").hidden = false;
+      $("#nu_name").value = vals.name; $("#nu_email").value = vals.email; $("#nu_role").value = vals.role; $("#nu_pass").value = vals.password;
+      return;
+    }
+    usersNote = { th: `สร้างบัญชี ${r.j.name} (${r.j.email}) แล้ว`, en: `Created ${r.j.name} (${r.j.email})`, kind: "ok" };
+    return openUsers();
+  }
   if (e.target.dataset.upwform) {
     const f = e.target, name = f.closest(".user-row")?.querySelector("b")?.textContent || "";
     if (await userCall("users/" + f.dataset.upwform, "PATCH", { password: f.querySelector("input").value }))
@@ -3362,7 +3390,7 @@ const AUDIT_ACTIONS = {
   "account.password": ["เปลี่ยนรหัสผ่าน", "Changed password"],
   "account.mfa_on": ["เปิดใช้ MFA", "Turned on MFA"], "account.mfa_off": ["ปิด MFA", "Turned off MFA"], "account.mfa_recovery_new": ["สร้างรหัสสำรอง MFA ใหม่", "Made new MFA recovery codes"],
   "auth.mfa_failed": ["กรอกรหัส MFA ผิด", "Wrong MFA code"], "auth.mfa_recovery_used": ["เข้าสู่ระบบด้วยรหัสสำรอง MFA", "Signed in with an MFA recovery code"],
-  "admin.mfa_reset": ["รีเซ็ต MFA ให้ผู้ใช้", "Reset a user's MFA"], "admin.password": ["ตั้งรหัสผ่านใหม่ให้ผู้ใช้", "Set a user's password"],
+  "admin.mfa_reset": ["รีเซ็ต MFA ให้ผู้ใช้", "Reset a user's MFA"], "admin.password": ["ตั้งรหัสผ่านใหม่ให้ผู้ใช้", "Set a user's password"], "admin.create_user": ["สร้างผู้ใช้", "Created a user"],
   "admin.role": ["เปลี่ยนสิทธิ์ผู้ใช้", "Changed a user's role"], "admin.verify": ["ยืนยันบัญชีให้ผู้ใช้", "Verified a user"],
   "admin.delete_user": ["ลบผู้ใช้", "Deleted a user"], "admin.settings": ["แก้การตั้งค่าระบบ", "Changed settings"],
   "diagram.create": ["สร้างผัง", "Created a diagram"], "diagram.edit": ["แก้ไขผัง", "Edited a diagram"], "diagram.delete": ["ลบผัง", "Deleted a diagram"],
@@ -3394,6 +3422,7 @@ function auditChange(c) {
   return `${what} · ${f}: “${auditValue(c.field, c.from)}” → “${auditValue(c.field, c.to)}”`;
 }
 function auditSummary(e) {
+  if (e.action === "admin.create_user") return `${e.target ? e.target.name + " (" + e.target.email + ")" : ""} · ${roleLabel(e.role)}`;
   if (e.action === "admin.role") return `${e.target ? e.target.name + " (" + e.target.email + ")" : ""}: ${roleLabel(e.from)} → ${roleLabel(e.to)}`;
   if (e.action === "auth.mfa_recovery_used") return L(`เหลือรหัสสำรอง ${e.left} รหัส`, `${e.left} recovery codes left`);
   if (e.action === "admin.verify" || e.action === "admin.delete_user" || e.action === "admin.mfa_reset" || e.action === "admin.password") return e.target ? `${e.target.name} (${e.target.email})` : "";

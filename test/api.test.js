@@ -315,3 +315,28 @@ test("security hardening from the 2026-11-25 assessment", async (t) => {
   await signUpAdmin(srv.base);
   assert.deepEqual((await anon.get("/api/diagrams")).body, { error: "login_required" });
 });
+
+test("an admin creates a user", async (t) => {
+  const srv = await startServer();
+  t.after(srv.stop);
+  const admin = await signUpAdmin(srv.base);
+  const ed = await addUser(srv.base, admin, "ed", "editor");
+  const nu = { name: "New Person", email: "New@Example.com", role: "viewer", password: "start-pass-12" };
+  assert.equal((await ed.post("/api/users", nu)).status, 403);
+  assert.equal((await admin.post("/api/users", { ...nu, password: "short" })).body.error, "weak_password");
+  assert.equal((await admin.post("/api/users", { ...nu, role: "boss" })).body.error, "bad_role");
+  assert.equal((await admin.post("/api/users", { ...nu, email: "ed@example.com" })).body.error, "email_taken");
+  const r = await admin.post("/api/users", nu);
+  assert.equal(r.status, 201);
+  assert.equal(r.body.email, "new@example.com");
+  assert.equal(r.body.role, "viewer");
+  assert.equal(r.body.verified, true);
+  // works at once, with the role the admin chose
+  const c = client(srv.base);
+  const l = await c.post("/api/auth/login", { email: "new@example.com", password: "start-pass-12" });
+  assert.equal(l.status, 200);
+  assert.equal((await c.get("/api/diagrams")).status, 200);
+  assert.equal((await c.post("/api/diagrams", { title: "x", nodes: [], links: [], zones: [] })).status, 403);
+  const log = (await admin.get("/api/audit?group=admin")).body;
+  assert.ok(log.some((e) => e.action === "admin.create_user" && e.target.email === "new@example.com" && e.role === "viewer"));
+});

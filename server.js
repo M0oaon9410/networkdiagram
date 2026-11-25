@@ -168,6 +168,7 @@ async function api(req, res, parts) {
     if (parts[1] === "users" || parts[1] === "settings") {
       if (me.role !== "admin") return send(res, 403, { error: "admin_only" });
       if (parts[1] === "users" && parts.length === 2 && req.method === "GET") return reply(auth.listUsers());
+      if (parts[1] === "users" && parts.length === 2 && req.method === "POST") return reply(await auth.createUser(req, me, await readJson(req)));
       if (parts[1] === "users" && parts.length === 3 && ID_RE.test(parts[2])) {
         if (req.method === "PATCH") return reply(await auth.updateUser(req, me, parts[2], await readJson(req)));
         if (req.method === "DELETE") return reply(await auth.deleteUser(req, me, parts[2]));
