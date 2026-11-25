@@ -26,21 +26,6 @@ const FONT_RE = /^[a-z0-9-]+\.(woff2|txt)$/;
 const AUTH_ON = !/^(0|off|false|no)$/i.test(process.env.AUTH || "");
 const CAN_EDIT = ["admin", "editor"];
 const CAN_VIEW = ["admin", "editor", "viewer"];
-// Everything the page needs is served from here; no framing by other sites; tokens in URLs never leak via Referer.
-const SECURITY_HEADERS = {
-  // HSTS: browsers that reached us over HTTPS stay on HTTPS for a year (ignored on plain HTTP, per RFC 6797)
-  "Strict-Transport-Security": "max-age=31536000",
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "Referrer-Policy": "no-referrer",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
-};
-
-fs.mkdirSync(DATA_DIR, { recursive: true });
-const audit = createAudit({ dataDir: DATA_DIR });
-const auth = AUTH_ON ? createAuth({ dataDir: DATA_DIR, audit }) : null;
-const live = createLive();
-
 // app.html holds the page content only; wrap it in a document skeleton once at startup.
 const APP_HTML =
   '<!doctype html><html lang="th"><head><meta charset="utf-8">' +
@@ -49,6 +34,27 @@ const APP_HTML =
   "body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style></head><body>" +
   fs.readFileSync(path.join(PUBLIC_DIR, "app.html"), "utf8") +
   "</body></html>";
+
+// Only the page's own script may run: CSP names it by its SHA-256 hash instead of allowing any inline script,
+// so markup that somehow got injected into the page still could not run code.
+const SCRIPT_HASHES = [...APP_HTML.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+  .map((m) => `'sha256-${crypto.createHash("sha256").update(m[1], "utf8").digest("base64")}'`);
+
+// Everything the page needs is served from here; no framing by other sites; tokens in URLs never leak via Referer.
+const SECURITY_HEADERS = {
+  // HSTS: browsers that reached us over HTTPS stay on HTTPS for a year, this host and any name below it (ignored on plain HTTP, per RFC 6797)
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  // style-src keeps 'unsafe-inline': the page sets positions and colours through style attributes, which hashes cannot cover
+  "Content-Security-Policy": `default-src 'self'; script-src 'self' ${SCRIPT_HASHES.join(" ")}; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
+};
+
+fs.mkdirSync(DATA_DIR, { recursive: true });
+const audit = createAudit({ dataDir: DATA_DIR });
+const auth = AUTH_ON ? createAuth({ dataDir: DATA_DIR, audit }) : null;
+const live = createLive();
 
 function send(res, status, body, type = "application/json; charset=utf-8") {
   if (status === 204) { res.writeHead(204, { "Cache-Control": "no-store", ...SECURITY_HEADERS }); return res.end(); }
@@ -137,7 +143,7 @@ async function api(req, res, parts) {
       return send(res, 404, { error: "not found" });
     }
     me = auth.currentUser(req);
-    if (!me) return send(res, 401, { error: "login_required", hasUsers: auth.hasUsers() });
+    if (!me) return send(res, 401, auth.hasUsers() ? { error: "login_required" } : { error: "login_required", hasUsers: false });
     if (parts[1] === "me") {
       if (parts.length === 2 && req.method === "GET") return send(res, 200, auth.publicUser(me));
       if (parts[2] === "password" && req.method === "POST") return reply(await auth.changePassword(req, me, await readJson(req)));
@@ -254,7 +260,9 @@ async function diagramLive(req, res, id, what, me) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
-    const parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+    let parts;
+    try { parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent); }
+    catch (e) { return send(res, 400, { error: "bad_request" }); }
     if (parts[0] === "api") return await api(req, res, parts);
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) return send(res, 200, APP_HTML, "text/html; charset=utf-8");
     if (req.method === "GET" && url.pathname === "/verify" && AUTH_ON) {

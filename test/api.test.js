@@ -292,3 +292,26 @@ test("an admin sets a new password for another user", async (t) => {
   assert.equal(log[0].action, "admin.password");
   assert.equal(log[0].target.email, "ed@example.com");
 });
+
+test("security hardening from the 2026-11-25 assessment", async (t) => {
+  const srv = await startServer();
+  t.after(srv.stop);
+  const anon = client(srv.base);
+  const page = await anon.get("/");
+  const csp = page.headers.get("content-security-policy");
+  const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src "));
+  assert.match(scriptSrc, /'sha256-[A-Za-z0-9+/]+=*'/);
+  assert.doesNotMatch(scriptSrc, /unsafe-inline/);
+  // the hash in the header is the hash of the script the page actually carries
+  const body = page.text.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const hash = require("node:crypto").createHash("sha256").update(body, "utf8").digest("base64");
+  assert.ok(scriptSrc.includes(`'sha256-${hash}'`));
+  assert.match(page.headers.get("strict-transport-security"), /max-age=31536000; includeSubDomains/);
+  // a malformed %-escape is a bad request, not a server error
+  assert.equal((await anon.get("/api/%ff%fe")).status, 400);
+  assert.equal((await anon.get("/%E0%A4%A")).status, 400);
+  assert.equal((await anon.get("/api/me", { headers: { Cookie: "np_sid=%ff" } })).status, 401);
+  // once accounts exist, a signed-out caller is not told so
+  await signUpAdmin(srv.base);
+  assert.deepEqual((await anon.get("/api/diagrams")).body, { error: "login_required" });
+});
