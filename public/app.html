@@ -3247,6 +3247,7 @@ function genPassword() {
   crypto.getRandomValues(buf);
   return [...buf].map((x) => abc[x % abc.length]).join("");
 }
+const mailKind = (k) => ({ verify: L("ลิงก์ยืนยันอีเมล", "verification link"), reset: L("ลิงก์ตั้งรหัสผ่านใหม่", "password reset link") }[k] || k || "");
 let usersNote = null;
 async function openUsers() {
   openModal("#usersModal");
@@ -3283,6 +3284,7 @@ async function openUsers() {
     + `</div><div class="actions"><button class="btn">${L("บันทึกการตั้งค่า MFA", "Save MFA setting")}</button></div></form>`
     + `<div class="sec">${L("การส่งอีเมล (SMTP)", "E-mail sending (SMTP)")}</div>`
     + `<p class="muted" style="margin:0;font-size:13px;line-height:1.6">${cfg.mailReady ? L("ตั้งค่าแล้ว ระบบจะส่งลิงก์ยืนยันและลิงก์ตั้งรหัสผ่านใหม่ทางอีเมล", "Set up. Verification and password links are sent by e-mail.") : L("ยังไม่ได้ตั้งค่า ระหว่างนี้ลิงก์ยืนยันจะแสดงใน log ของเซิร์ฟเวอร์ (docker compose logs) หรือกด “ยืนยันให้” ที่รายชื่อด้านบน", "Not set up. Until then, links appear in the server log (docker compose logs), or press “Verify” in the list above.")}</p>`
+    + (cfg.lastMail ? `<div class="note ${cfg.lastMail.ok ? "ok" : "err"}" style="margin-top:8px">${esc(L("ส่งล่าสุด", "Last send"))} ${esc(new Date(cfg.lastMail.at).toLocaleString(L("th-TH", "en-GB")))} · ${esc(cfg.lastMail.to)} · ${esc(mailKind(cfg.lastMail.kind))} · ${cfg.lastMail.ok ? esc(L("สำเร็จ", "sent")) : esc(L("ไม่สำเร็จ: ", "failed: ") + cfg.lastMail.error)}</div>` : "")
     + `<form id="smtpForm"><div class="fields">${inp("s_host", L("เซิร์ฟเวอร์ SMTP", "SMTP server"), s.host, { ph: "smtp.gmail.com" })}${inp("s_port", L("พอร์ต", "Port"), s.port, { ph: "587", type: "number" })}`
     + `${inp("s_user", L("ชื่อผู้ใช้", "Username"), s.user, { ph: "you@example.com" })}${inp("s_pass", L("รหัสผ่าน / App password", "Password / app password"), "", { type: "password", ph: s.hasPass ? L("บันทึกไว้แล้ว (เว้นว่างถ้าไม่เปลี่ยน)", "saved (leave blank to keep)") : "" })}`
     + `${inp("s_from", L("ผู้ส่ง (From)", "Sender (From)"), s.from, { ph: "AON <you@example.com>", full: true })}`
@@ -3391,6 +3393,7 @@ const AUDIT_ACTIONS = {
   "account.mfa_on": ["เปิดใช้ MFA", "Turned on MFA"], "account.mfa_off": ["ปิด MFA", "Turned off MFA"], "account.mfa_recovery_new": ["สร้างรหัสสำรอง MFA ใหม่", "Made new MFA recovery codes"],
   "auth.mfa_failed": ["กรอกรหัส MFA ผิด", "Wrong MFA code"], "auth.mfa_recovery_used": ["เข้าสู่ระบบด้วยรหัสสำรอง MFA", "Signed in with an MFA recovery code"],
   "admin.mfa_reset": ["รีเซ็ต MFA ให้ผู้ใช้", "Reset a user's MFA"], "admin.password": ["ตั้งรหัสผ่านใหม่ให้ผู้ใช้", "Set a user's password"], "admin.create_user": ["สร้างผู้ใช้", "Created a user"],
+  "mail.sent": ["ส่งอีเมลสำเร็จ", "E-mail sent"], "mail.failed": ["ส่งอีเมลไม่สำเร็จ", "E-mail failed"], "mail.not_configured": ["ไม่ได้ส่งอีเมล (ยังไม่ตั้งค่า SMTP)", "E-mail not sent (SMTP not set up)"],
   "admin.role": ["เปลี่ยนสิทธิ์ผู้ใช้", "Changed a user's role"], "admin.verify": ["ยืนยันบัญชีให้ผู้ใช้", "Verified a user"],
   "admin.delete_user": ["ลบผู้ใช้", "Deleted a user"], "admin.settings": ["แก้การตั้งค่าระบบ", "Changed settings"],
   "diagram.create": ["สร้างผัง", "Created a diagram"], "diagram.edit": ["แก้ไขผัง", "Edited a diagram"], "diagram.delete": ["ลบผัง", "Deleted a diagram"],
@@ -3422,6 +3425,7 @@ function auditChange(c) {
   return `${what} · ${f}: “${auditValue(c.field, c.from)}” → “${auditValue(c.field, c.to)}”`;
 }
 function auditSummary(e) {
+  if (e.action.startsWith("mail.")) return `${e.to || ""} · ${mailKind(e.kind)}${e.error ? " · " + e.error : ""}`;
   if (e.action === "admin.create_user") return `${e.target ? e.target.name + " (" + e.target.email + ")" : ""} · ${roleLabel(e.role)}`;
   if (e.action === "admin.role") return `${e.target ? e.target.name + " (" + e.target.email + ")" : ""}: ${roleLabel(e.from)} → ${roleLabel(e.to)}`;
   if (e.action === "auth.mfa_recovery_used") return L(`เหลือรหัสสำรอง ${e.left} รหัส`, `${e.left} recovery codes left`);
@@ -3445,7 +3449,7 @@ async function openAudit() {
     <p class="muted" style="margin:0;font-size:13px;line-height:1.55">${L("การแก้ไขผังของคนเดียวกันในช่วงเวลาใกล้กันจะรวมเป็นรายการเดียว และแสดงหลังหยุดแก้ไขประมาณ 2 นาที", "Edits by the same person close together are grouped into one entry, which appears about 2 minutes after they stop editing.")}</p>
     <form id="auditForm" class="fields audit-filters">
       <div class="f"><label for="af_user">${L("ผู้ใช้", "User")}</label><select id="af_user">${opt("", L("ทุกคน", "Everyone"), f.user)}${users.map((u) => opt(u.id, `${u.name} (${u.email})`, f.user)).join("")}</select></div>
-      <div class="f"><label for="af_group">${L("ประเภท", "Type")}</label><select id="af_group">${opt("", L("ทั้งหมด", "All"), f.group)}${opt("diagram", L("การแก้ไขผัง", "Diagram changes"), f.group)}${opt("auth", L("การเข้าสู่ระบบ", "Sign-ins"), f.group)}${opt("account", L("บัญชีผู้ใช้", "Accounts"), f.group)}${opt("admin", L("งานผู้ดูแลระบบ", "Admin actions"), f.group)}</select></div>
+      <div class="f"><label for="af_group">${L("ประเภท", "Type")}</label><select id="af_group">${opt("", L("ทั้งหมด", "All"), f.group)}${opt("diagram", L("การแก้ไขผัง", "Diagram changes"), f.group)}${opt("auth", L("การเข้าสู่ระบบ", "Sign-ins"), f.group)}${opt("account", L("บัญชีผู้ใช้", "Accounts"), f.group)}${opt("admin", L("งานผู้ดูแลระบบ", "Admin actions"), f.group)}${opt("mail", L("การส่งอีเมล", "E-mail"), f.group)}</select></div>
       <div class="f"><label for="af_diagram">${L("ผัง", "Diagram")}</label><select id="af_diagram">${opt("", L("ทุกผัง", "All diagrams"), f.diagram)}${diagrams.map((d) => opt(d.id, d.title, f.diagram)).join("")}</select></div>
       <div class="f"><label for="af_q">${L("ค้นหาคำ", "Search")}</label><input id="af_q" value="${esc(f.q)}" placeholder="${L("เช่น ชื่ออุปกรณ์, IP", "e.g. device name, IP")}"></div>
       <div class="f"><label for="af_from">${L("ตั้งแต่วันที่", "From")}</label><input id="af_from" type="date" value="${esc(f.from)}"></div>
@@ -3473,7 +3477,7 @@ async function loadAudit() {
   const when = (t) => new Date(t).toLocaleString(L("th-TH", "en-GB"), { dateStyle: "medium", timeStyle: "medium" });
   list.innerHTML = `<p class="muted" style="margin:0 0 6px;font-size:12.5px">${L(`แสดง ${auditRows.length} รายการล่าสุด`, `Showing the latest ${auditRows.length}`)}</p>` + auditRows.map((e) => {
     const act = AUDIT_ACTIONS[e.action] ? L(...AUDIT_ACTIONS[e.action]) : e.action;
-    const bad = e.action === "auth.login_failed" || e.action === "auth.locked" || e.action === "auth.mfa_failed" || e.action.endsWith("delete") || e.action === "admin.delete_user";
+    const bad = e.action === "mail.failed" || e.action === "mail.not_configured" || e.action === "auth.login_failed" || e.action === "auth.locked" || e.action === "auth.mfa_failed" || e.action.endsWith("delete") || e.action === "admin.delete_user";
     const ch = (e.changes || []).map(auditChange);
     const first = ch.slice(0, 6), rest = ch.slice(6);
     let det = first.length ? `<ul>${first.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : "";

@@ -48,7 +48,7 @@ test("activity log", async (t) => {
   await t.test("sign-ins, failures and admin actions are recorded, newest first", async () => {
     const all = await audit();
     const actions = all.map((e) => e.action);
-    assert.deepEqual(actions, ["auth.login_failed", "auth.login", "admin.verify", "admin.role", "account.register", "auth.login", "account.register"]);
+    assert.deepEqual(actions, ["auth.login_failed", "auth.login", "admin.verify", "admin.role", "account.register", "mail.not_configured", "auth.login", "account.register"]);
     const failed = all[0];
     assert.equal(failed.email, "editor@example.com");
     assert.equal(failed.user.name, "editor");
@@ -62,7 +62,10 @@ test("activity log", async (t) => {
     const mine = await audit({ user: admin.user.id });
     assert.ok(mine.length >= 3 && mine.every((e) => e.user.id === admin.user.id));
     assert.deepEqual((await audit({ q: "LOGIN_FAILED" })).map((e) => e.action), ["auth.login_failed"]);
-    assert.equal((await audit({ q: "EDITOR@EXAMPLE" })).length, 5);
+    assert.equal((await audit({ q: "EDITOR@EXAMPLE" })).length, 6);
+    const mail = await audit({ group: "mail" });
+    assert.deepEqual(mail.map((e) => [e.action, e.to, e.kind]), [["mail.not_configured", "editor@example.com", "verify"]]);
+    assert.equal((await admin.get("/api/settings")).body.lastMail.ok, false);
     const one = await audit({ limit: "1" });
     assert.equal(one.length, 1);
     assert.equal(one[0].action, "auth.login_failed");
@@ -128,4 +131,16 @@ test("development languages: an old single language and the same list read the s
   assert.deepEqual(diffDiagrams(doc({ lang: "PHP", langVer: "8.3" }), doc({ langs: [{ lang: "PHP", ver: "8.3" }] })), []);
   assert.deepEqual(diffDiagrams(doc({ langs: [{ lang: "PHP", ver: "8.3" }] }), doc({ langs: [{ lang: "PHP", ver: "8.3" }, { lang: "Node.js", ver: "20" }, { lang: "", ver: "" }] })),
     [{ op: "edit", kind: "node", name: "WEB-01", field: "langs", from: "PHP 8.3", to: "PHP 8.3, Node.js 20" }]);
+});
+
+test("a long Thai email subject is split into short encoded words", () => {
+  const { encodeWord } = require("../lib/mailer");
+  const subject = "รีเซ็ตรหัสผ่านสำหรับ AON (Asset and Operational Network)";
+  const out = encodeWord(subject);
+  const words = out.split("\r\n ");
+  assert.ok(words.length > 1);
+  for (const w of words) assert.ok(w.length <= 75, w);
+  const back = words.map((w) => Buffer.from(w.match(/^=\?UTF-8\?B\?(.*)\?=$/)[1], "base64")).reduce((a, b) => Buffer.concat([a, b]));
+  assert.equal(back.toString("utf8"), subject);
+  assert.equal(encodeWord("Hello"), "Hello");
 });
