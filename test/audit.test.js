@@ -165,3 +165,12 @@ test("a failed test e-mail shows the SMTP error instead of a bare 502", async (t
   assert.equal(mail[0].kind, "test");
   assert.equal((await admin.get("/api/settings")).body.lastMail.ok, false);
 });
+
+test("a sender name without an address uses the SMTP account, and is quoted", () => {
+  const { senderOf, formatAddress } = require("../lib/mailer");
+  const from = senderOf({ from: "AON(Asset and Operational Network))", user: "me@gmail.com" });
+  assert.equal(from, "AON(Asset and Operational Network)) <me@gmail.com>");
+  assert.equal(formatAddress(from), '"AON(Asset and Operational Network))" <me@gmail.com>');
+  assert.equal(senderOf({ from: "", user: "me@gmail.com" }), "me@gmail.com");
+  assert.equal(senderOf({ from: "AON <noreply@example.com>", user: "me@gmail.com" }), "AON <noreply@example.com>");
+});
