@@ -175,7 +175,7 @@ async function api(req, res, parts) {
       }
       if (parts[1] === "settings" && parts.length === 2 && req.method === "GET") return reply(auth.getSettings(req));
       if (parts[1] === "settings" && parts.length === 2 && req.method === "PUT") return reply(await auth.putSettings(req, me, await readJson(req)));
-      if (parts[1] === "settings" && parts[2] === "test" && req.method === "POST") return reply(await auth.testMail(me));
+      if (parts[1] === "settings" && parts[2] === "test" && req.method === "POST") return reply(await auth.testMail(req, me));
       return send(res, 404, { error: "not found" });
     }
     if (!CAN_VIEW.includes(me.role)) return send(res, 403, { error: "pending" });

@@ -144,3 +144,24 @@ test("a long Thai email subject is split into short encoded words", () => {
   assert.equal(back.toString("utf8"), subject);
   assert.equal(encodeWord("Hello"), "Hello");
 });
+
+test("a failed test e-mail shows the SMTP error instead of a bare 502", async (t) => {
+  const srv = await startServer();
+  t.after(srv.stop);
+  const admin = await signUpAdmin(srv.base);
+  let r = await admin.post("/api/settings/test", {});
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.body.ok, r.body.detail], [false, "SMTP not configured"]);
+  // a port nothing listens on: the connection is refused
+  const net = require("node:net");
+  const port = await new Promise((ok) => { const s = net.createServer().listen(0, () => { const p = s.address().port; s.close(() => ok(p)); }); });
+  await admin.put("/api/settings", { smtp: { host: "127.0.0.1", port, secure: false, user: "", pass: "", from: "AON <noreply@example.com>" } });
+  r = await admin.post("/api/settings/test", {});
+  assert.equal(r.status, 200);
+  assert.equal(r.body.ok, false);
+  assert.match(r.body.detail, /ECONNREFUSED/);
+  const mail = (await admin.get("/api/audit?group=mail")).body;
+  assert.equal(mail[0].action, "mail.failed");
+  assert.equal(mail[0].kind, "test");
+  assert.equal((await admin.get("/api/settings")).body.lastMail.ok, false);
+});

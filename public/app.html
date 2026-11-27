@@ -3247,7 +3247,7 @@ function genPassword() {
   crypto.getRandomValues(buf);
   return [...buf].map((x) => abc[x % abc.length]).join("");
 }
-const mailKind = (k) => ({ verify: L("ลิงก์ยืนยันอีเมล", "verification link"), reset: L("ลิงก์ตั้งรหัสผ่านใหม่", "password reset link") }[k] || k || "");
+const mailKind = (k) => ({ verify: L("ลิงก์ยืนยันอีเมล", "verification link"), reset: L("ลิงก์ตั้งรหัสผ่านใหม่", "password reset link"), test: L("อีเมลทดสอบ", "test e-mail") }[k] || k || "");
 let usersNote = null;
 async function openUsers() {
   openModal("#usersModal");
@@ -3340,8 +3340,9 @@ $("#usersBody").addEventListener("click", async (e) => {
     const b = e.target.closest("#smtpTest"); b.disabled = true; b.textContent = L("กำลังส่ง…", "Sending…");
     await saveSmtp(true);
     const r = await postJson("settings/test", {});
-    usersNote = r.ok ? { th: `ส่งอีเมลทดสอบไปที่ ${me.email} แล้ว`, en: `Test e-mail sent to ${me.email}`, kind: "ok" }
-      : { th: "ส่งไม่สำเร็จ: " + (r.j.detail || r.j.error || r.status), en: "Sending failed: " + (r.j.detail || r.j.error || r.status), kind: "err" };
+    usersNote = r.ok && r.j.ok ? { th: `ส่งอีเมลทดสอบไปที่ ${me.email} แล้ว`, en: `Test e-mail sent to ${me.email}`, kind: "ok" }
+      : r.j.detail || r.j.error ? { th: "ส่งไม่สำเร็จ: " + (r.j.detail || r.j.error), en: "Sending failed: " + (r.j.detail || r.j.error), kind: "err" }
+      : { th: `ส่งไม่สำเร็จ: เซิร์ฟเวอร์ตอบ ${r.status} ไม่มีรายละเอียด ดูสาเหตุได้ที่บันทึกการใช้งาน (การส่งอีเมล) หรือ docker compose logs`, en: `Sending failed: the server answered ${r.status} with no details. See the activity log (E-mail) or docker compose logs.`, kind: "err" };
     openUsers();
   }
 });
